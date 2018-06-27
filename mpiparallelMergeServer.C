@@ -112,7 +112,7 @@ static void R__MigrateKey(TDirectory *destination, TDirectory *source)
 if (destination==0 || source==0) return;
 printf("R__MigrateKey::Trying to migrate the file\n ");
 TIter nextkey(source->GetListOfKeys());
-printf("R__MigrateKey::Trying to get the list of keys\n");
+//printf("R__MigrateKey::Trying to get the list of keys\n");
    TKey *key;
    while( (key = (TKey*)nextkey()) ) {
       TClass *cl = TClass::GetClass(key->GetClassName());
@@ -165,7 +165,7 @@ struct ClientInfo
          // We need to keep any of the keys from the previous file that
          // are not in the new file.
          if (fFile) {	 
-	   printf("Set::File already exists...migrating keys\n");
+	   //printf("Set::File already exists...migrating keys\n");
             R__MigrateKey(fFile,file);
             // delete the previous memory file (if any)
             delete file;
@@ -244,9 +244,9 @@ struct ParallelFileMerger : public TObject
       // Merge the current inputs into the output file.
 
       R__DeleteObject(fMerger.GetOutputFile(),kFALSE); // Remove object that can *not* be incrementally merge and will *not* be reset by the client code.
-      printf("Merge::size of fClients: %d\n",fClients.size());
+      // printf("Merge::size of fClients: %d\n",fClients.size());
       for(unsigned int f = 0 ; f < fClients.size(); ++f) {
-	printf("Merge::Merging files %d\n",f);
+	//printf("Merge::Merging files %d\n",f);
          fMerger.AddFile(fClients[f].fFile);
       }
       Bool_t result = fMerger.PartialMerge(TFileMerger::kAllIncremental);
@@ -289,7 +289,7 @@ struct ParallelFileMerger : public TObject
       // Calculate average and rms of the time between the last 2 contacts.
       Double_t sum = 0;
       Double_t sum2 = 0;
-      printf("NeedMerge:: Size of fClients: %d\n",fClients.size());
+      //printf("NeedMerge:: Size of fClients: %d\n",fClients.size());
       for(unsigned int c = 0 ; c < fClients.size(); ++c) {
          sum += fClients[c].fTimeSincePrevContact;
          sum2 += fClients[c].fTimeSincePrevContact*fClients[c].fTimeSincePrevContact;
@@ -357,9 +357,9 @@ void mpiparallelMergeServer(bool cache = false,int argc=0) {
     count = file.GetSize();
     char *buf = new char[count];
     file.CopyTo(buf,count);
-    printf("Buffer of size %d written in rank %d\n",count,rank);
+    //printf("Buffer of size %d written in rank %d\n",count,rank);
     MPI_Send(buf,count,MPI_CHAR,0,0,MPI_COMM_WORLD);
-    printf("Message from rank %d sent\n",rank);
+    //printf("Message from rank %d sent\n",rank);
   }
   else if(rank==0){
     printf("now in rank %d\n",rank);
@@ -372,7 +372,7 @@ void mpiparallelMergeServer(bool cache = false,int argc=0) {
       MPI_Status status;
       MPI_Probe(i,0,MPI_COMM_WORLD,&status);
       MPI_Get_count(&status,MPI_CHAR,&count);
-      printf("count of incoming message %d\n",count);
+      //printf("count of incoming message %d\n",count);
       int source;
       source = status.MPI_SOURCE;
       Int_t client_Id = source-1;
@@ -386,7 +386,7 @@ void mpiparallelMergeServer(bool cache = false,int argc=0) {
 	int number_bytes;
 	number_bytes = sizeof(char)*count;
 	buf = new char[number_bytes];
-	printf("Trying to receive the message here\n");
+	//printf("Trying to receive the message here\n");
 	MPI_Recv(buf,number_bytes,MPI_CHAR,i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 	printf("received the message now %d\n",i);
 	char incoming[100];
@@ -394,23 +394,23 @@ void mpiparallelMergeServer(bool cache = false,int argc=0) {
 	tot_bytes += number_bytes; //this should take care of memory update
 	TMemFile *infile = new TMemFile(incoming,buf,number_bytes,"UPDATE");
 	Long64_t _filesize = infile->GetSize();
-	printf("size of the current transient file is %d\n",_filesize);
-	printf("transient file updated....\n");
+	//printf("size of the current transient file is %d\n",_filesize);
+	//	printf("transient file updated....\n");
 	const Float_t clientThreshold= 0.75;
 	ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(incoming);
 	if(!info){
-	  printf("no file created yet %d\n",i);
+	  //printf("no file created yet %d\n",i);
 	  info = new ParallelFileMerger(incoming,cache);
 	  mergers.Add(info);
 	}
 	if(R__NeedInitialMerge(infile)){
-	  printf("trying to merge the file....\n");
+	  // printf("trying to merge the file....\n");
 	  info->InitialMerge(infile);
-	  printf("did I merge the file yet...\n");
+	  //printf("did I merge the file yet...\n");
 	}
 	info->RegisterClient(client_Id,infile);
 	if(info->NeedMerge(clientThreshold)){
-	    printf("Mergin from client %d\n",client_Id);
+	  //printf("Mergin from client %d\n",client_Id);
 	     info->Merge();
 	}
 	infile=0;
