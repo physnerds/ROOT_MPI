@@ -245,10 +245,10 @@ struct ParallelFileMerger : public TObject
 
       R__DeleteObject(fMerger.GetOutputFile(),kFALSE); // Remove object that can *not* be incrementally merge and will *not* be reset by the client code.
       // printf("Merge::size of fClients: %d\n",fClients.size());
-      for(unsigned int f = 0 ; f < fClients.size(); ++f) {
+      //  for(unsigned int f = 0 ; f < fClients.size(); ++f) {
 	//printf("Merge::Merging files %d\n",f);
-         fMerger.AddFile(fClients[f].fFile);
-      }
+      fMerger.AddFile(fClients[fClients.size()-1].fFile);
+	 //  }
       Bool_t result = fMerger.PartialMerge(TFileMerger::kAllIncremental);
 
       // Remove any 'resetable' object (like TTree) from the input file so that they will not
