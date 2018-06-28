@@ -331,7 +331,10 @@ struct ParallelFileMerger : public TObject
   // ClassDef(ParallelFileMerger,0);
 };
 
-void mpiparallelMergeServer(bool cache = false,int argc=0,MPI_Comm comm) {
+void mpiparallelMergeServer(bool cache = false,int argc=0,MPI_Comm comm=0,int color=0) {
+  //declare the functions here....
+  void ReceiveAndMerge(bool cache,int argc, MPI_Comm _comm,int color);
+  void CreateBufferAndSend(bool cache,int _argc,MPI_Comm _comm);
   int rank, world_size;
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&world_size);
@@ -359,77 +362,13 @@ void mpiparallelMergeServer(bool cache = false,int argc=0,MPI_Comm comm) {
     char *buf = new char[count];
     file.CopyTo(buf,count);
     printf("Buffer of size %d written in rank %d\n",count,rank);
-    MPI_Send(buf,count,MPI_CHAR,0,0,MPI_COMM_WORLD);
+    MPI_Send(buf,count,MPI_CHAR,0,color,comm);
     printf("Message from rank %d sent\n",rank);
   }
-  else if(rank==0){
-    printf("now in rank %d\n",rank);
-    int tot_bytes=0;
-    THashTable mergers;
-    for(int i = 1;i<world_size;i++){
-      UInt_t clientIndex = i;
-      int count;
-      char* buf;
-      MPI_Status status;
-      MPI_Probe(i,0,MPI_COMM_WORLD,&status);
-      MPI_Get_count(&status,MPI_CHAR,&count);
-      printf("count of incoming message %d\n",count);
-      int source;
-      source = status.MPI_SOURCE;
-      Int_t client_Id = source-1;
-      
-      if(count<0){
-	printf("Message not received from source %d\n",source);
-	//probably no need to end the program...
-	// MPI_Finalize();
-      }
-      if(count>0){
-	int number_bytes;
-	number_bytes = sizeof(char)*count;
-	buf = new char[number_bytes];
-	printf("Trying to receive the message here\n");
-	MPI_Recv(buf,number_bytes,MPI_CHAR,i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
-	printf("received the message now %d\n",i);
-	char incoming[100];
-	sprintf(incoming,"tempfile_coming.root");
-	tot_bytes += number_bytes; //this should take care of memory update
-	TMemFile *infile = new TMemFile(incoming,buf,number_bytes,"UPDATE");
-	Long64_t _filesize = infile->GetSize();
-	printf("size of the current transient file is %d\n",_filesize);
-	printf("transient file updated....\n");
-	const Float_t clientThreshold= 0.75;
-	ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(incoming);
-	if(!info){
-	  printf("no file created yet %d\n",i);
-	  info = new ParallelFileMerger(incoming,cache);
-	  mergers.Add(info);
-	}
-	  if(R__NeedInitialMerge(infile)){
-	  printf("trying to merge the file....\n");
-	  info->InitialMerge(infile);
-	  printf("did I merge the file yet...\n");
-	  }
-	info->RegisterClient(client_Id,infile);
-	if(info->NeedMerge(clientThreshold)){
-	    printf("Mergin from client %d\n",client_Id);
-	     info->Merge();
-	}
-	infile=0;
-	}
-      TIter next(&mergers);
-      ParallelFileMerger *info;
-      while ((info = (ParallelFileMerger*)next())){
-	printf("now doing final Merge....\n");
-	if(info->NeedFinalMerge()){
-	  info->Merge();
-	}
-      }
-      }
-    mergers.Delete();
-      }
+  ReceiveAndMerge(cache,argc,comm,color);
   }
 //Here the creating part is only done once...merging done in multiple places..
-void CreateBufferAndSend(bool cache=false,int argc=0,MPI_Comm comm){
+void CreateBufferAndSend(bool cache=false,MPI_Comm comm=0){
   int rank,size;
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&size);
@@ -440,7 +379,7 @@ void CreateBufferAndSend(bool cache=false,int argc=0,MPI_Comm comm){
   TRandom *rand = new TRandom();
   Float_t px,py;
   TTree *tree = new TTree("tree","tree");
-  tree->SetAutoFlux(4000000);
+  tree->SetAutoFlush(4000000);
   tree->Branch("px",&px);
   tree->Branch("py",&py);
   
@@ -455,7 +394,7 @@ void CreateBufferAndSend(bool cache=false,int argc=0,MPI_Comm comm){
   file.CopyTo(buff,count);
   MPI_Send(buff,count,MPI_CHAR,0,0,comm);
 }      
-void ReceiveAndMerge(bool cache=false,int argc=0;MPI_Comm comm){
+void ReceiveAndMerge(bool cache=false,int argc=0,MPI_Comm comm=0,int color=0){
   int rank,size;
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&size);
@@ -480,7 +419,7 @@ void ReceiveAndMerge(bool cache=false,int argc=0;MPI_Comm comm){
     MPI_Recv(buf,number_bytes,MPI_CHAR,i,0,MPI_COMM_WORLD,MPI_STATUS_IGNORE); 
 
     TMemFile *infile = new TMemFile(incoming,buf,number_bytes,"UPDATE");
-    const Float_t clientThrehold = 0.75;
+    const Float_t clientThreshold = 0.75;
     ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(incoming);
     if(!info){
       info = new ParallelFileMerger(incoming,cache);
@@ -497,9 +436,8 @@ void ReceiveAndMerge(bool cache=false,int argc=0;MPI_Comm comm){
 	     info->Merge();
 	}
 	infile=0;
-  }
+  
   TIter next(&mergers);
-  ParallelFileMerger *info;
   while((info = (ParallelFileMerger*)next())){
       if(info->NeedFinalMerge()){
 	info->Merge();
@@ -510,27 +448,38 @@ void ReceiveAndMerge(bool cache=false,int argc=0;MPI_Comm comm){
     final_file = new TFile(incoming,"READONLY");
     Long64_t final_count = final_file->GetSize();
     char *final_buf = new char[final_count];
-    final_file->WriteBuffer(final_buf,final_cout);
+    final_file->WriteBuffer(final_buf,final_count);
     // SendBuffer(final_buff,final_count,another_comm);  
     delete final_file;
     delete final_buf;
+  }
   }
   mergers.Delete();
   
   //try to implement the sending thing...
 }
 void SendBuffer(char *buff,int buff_size,int color,MPI_Comm comm){
-  int comm_size;
+  int comm_size,comm_rank;
   MPI_Comm_size(comm,&comm_size);
+  MPI_Comm_rank(comm,&comm_rank);
   // allocate zero as the sender
-  for(int i =1;i<comm_size;i++)MPI_Send(buff,buff_size,0,color,comm);
+  if(comm_rank!=0)MPI_Send(buff,buff_size,MPI_CHAR,0,color,comm);
+  else return;
    
 }
-MPI_Comm SplitMPIComm(MPI_Comm source){
-  int source_rank;
+//Right now implement splitting into two only...
+MPI_Comm SplitMPIComm(MPI_Comm source,int comm_no){
+  void CreateBufferAndSend(bool cache,MPI_Comm comm);
+  void mpiparallelMergeServer(bool cache,int argc,MPI_Comm comm,int color);
+  int source_rank,source_size;
   MPI_Comm row_comm;
   MPI_Comm_rank(source,&source_rank);
-  int color = source_rank/2;
+  MPI_Comm_size(source,&source_size);
+  if(comm_no>source_size){
+    printf("number of sub communicators larger than mother size....Exiting\n");
+    exit(1);
+  }
+  int color = comm_no*source_rank/source_size;
   MPI_Comm_split(source,color,source_rank,&row_comm);
   return row_comm;
 }
@@ -541,10 +490,12 @@ void GetMergedROOTFile(TMemFile* file,TMemFile* fFile){
 
 int main(int argc,char** argv){
   MPI_Init(&argc,&argv);
-  mpiparallelMergeServer(false,0,MPI_COMM_WORLD);
+  int color=0;
+  mpiparallelMergeServer(false,0,MPI_COMM_WORLD,color);
   MPI_Finalize();
   return 0;
-}	  
+}
+	  
     
 	     
        
