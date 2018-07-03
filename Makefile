@@ -1,9 +1,9 @@
 
-PROGS = mpiparallelMergeServer
-INCLUDES = -I /nfs2/abashyal/mpich/build/include/ -I$(shell root-config --incdir)
-CC = mpic++
+PROGS = mpiparallelMerger
+INCLUDES = -I /Users/bashyala/Documents/mpich/mpich-3.2.1/mpich_build/include/ -I$(shell root-config --incdir)
+CC = /Users/bashyala/Documents/mpich/mpich-3.2.1/mpich_build/bin/mpic++
 COPTS = -fPIC -DLINUX -o0 -g $(shell root-config --cflags) -m64
-MPDIR = /nfs2/abashyal/mpich/build/lib
+MPDIR = /Users/bashyala/Documents/mpich/mpich-3.2.1/mpich_build/lib
 MPLIB = -lmpich -lmpi -lmpicxx -lmpl -lopa
 ROOTLIBS = $(shell root-config --libs) -lEG
 
