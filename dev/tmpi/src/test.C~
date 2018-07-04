@@ -1,0 +1,9 @@
+#include "TMPIFile.h"
+
+
+void test.C{
+  
+  TMPIFile *somefile = new TMPIFile("name",
+
+
+}
