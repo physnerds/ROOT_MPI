@@ -14,6 +14,7 @@ TMPIFile is like a TFile except it reads and writes in memory using TMPIFile and
 #include "TClass.h"
 #include "TVirtualMutex.h"
 #include "TMPIFile.h"
+#include "TFileCacheWrite.h"
 #include "mpi.h"
 /*
 Will basically add all the headers from TMemFile.cxx File later...
@@ -32,14 +33,70 @@ TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
   //Initialize MPI if it is not already initialized...
   int flag;
   MPI_Initialized(&flag);
-  if(!flag) MPI_Init(&argc,&argv);
-  
+  if(!flag) MPI_Init(&argc,&argv); 
 }
 TMPIFile::~TMPIFile(){
   MPI_Finalize();
 }
 
 //defining the ParallelFileMerger here.....
+//constructor for ParallelFileMerger
+TMPIFile::ParallelFileMerger::ParallelFileMerger(const char *filename,Bool_t writeCache):fFilename(filename),fClientsContact(0),fMerger(kFALSE,kTRUE)
+{
+  fMerger.SetPrintLevel(0);
+  fMerger.OutputFile(filename,"RECREATE");
+  if(writeCache)new TFileCacheWrite(fMerger.GetOutputFile(),32*1024*1024);
+
+}
+//And the destructor....
+TMPIFile::ParallelFileMerger::~ParallelFileMerger()
+{
+  for(ClientColl_t::iterator iter = fClients.begin();
+      iter != fClients.end();++iter)delete iter->fFile;
+
+}
+ULong_t TMPIFile::ParallelFileMerger::Hash()const{
+  return fFilename.Hash();
+}
+const char *TMPIFile::ParallelFileMerger::GetName()const{
+  return fFilename;
+}
+Bool_t TMPIFile::ParallelFileMerger::InitialMerge(TFile *input)
+{
+      // Initial merge of the input to copy the resetable object (TTree) into the output
+      // and remove them from the input file.
+  fMerger.AddFile(input);
+  Bool_t result = fMerger.PartialMerge(TFileMerger::kIncremental | TFileMerger::kResetable);
+  tcl.R__DeleteObject(input,kTRUE);
+  return result;
+}
+Bool_t TMPIFile::ParallelFileMerger::Merge()
+{
+  tcl.R__DeleteObject(fMerger.GetOutputFile(),kFALSE); //removing object that cannot be incrementally merged and will not be reset by the client code..
+  for(unsigned int f = 0; f<fClients.size();++f){
+    fMerger.AddFile(fClients[f].fFile);
+  }
+  Bool_t result = fMerger.PartialMerge(TFileMerger::kAllIncremental);
+  // Remove any 'resetable' object (like TTree) from the input file so that they will not
+  // be re-merged.  Keep only the object that always need to be re-merged (Histograms).
+  for(unsigned int f = 0 ; f < fClients.size(); ++f) {
+    if (fClients[f].fFile) {
+      tcl.R__DeleteObject(fClients[f].fFile,kTRUE);
+    } else {
+      // We back up the file (probably due to memory constraint)
+      TFile *file = TFile::Open(fClients[f].fLocalName,"UPDATE");
+      tcl.R__DeleteObject(file,kTRUE); // Remove object that can be incrementally merge and will be reset by the client code.
+      file->Write();
+      delete file;
+    }
+  }
+  fLastMerge = TTimeStamp();
+  fNClientsContact = 0;
+  fClientsContact.Clear();
+
+  return result;
+}
+
  void TMPIFile::R__MigrateKey(TDirectory *destination, TDirectory *source)
 {
 if (destination==0 || source==0) return;
