@@ -9,6 +9,8 @@
 #include "TROOT.h"
 #include "TClientInfo.h"
 #include "TFileMerger.h"
+#include "THashTable.h"
+#include "TBits.h"
 #include <vector>
 #include <memory>
 
@@ -29,16 +31,23 @@ virtual ~TMPIFile();
  struct ParallelFileMerger : public TObject{
  public:
    typedef std::vector<TClientInfo>ClientColl_t;
-   TFile *fFile;
-   TString fLocalName;
-   UInt_t fNContactsCount;
+   TString fFilename;
+   TBits fClientsContact;
+   UInt_t fNClientsContact;
+   ClientColl_t fClients;
    TTimeStamp fLastMerge;
    TFileMerger fMerger;
    ParallelFileMerger(const char *filename,Bool_t writeCache=kFALSE);
+   virtual ~ParallelFileMerger();
+   ULong_t Hash() const;
+   const char *GetName()const;
+   Bool_t InitialMerge(TFile *input);
+   Bool_t Merge();
+   Bool_t NeedFinalMerge();
+   TClientInfo tcl;
  }; 
 
  ClassDef(TMPIFile,0)
 
- 
 };
 #endif
