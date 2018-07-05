@@ -1,13 +1,15 @@
 OBJS_LIB = $(shell ls src/*.cxx | sed 's/\.cxx/.o/')
 PROGS = $(shell ls src/*.C | sed 's/\.C//' | sed 's/src\///')
-INCLUDES = -I./include -I $(MPINCLUDES) -I$(shell root-config --incdir)
 CC = mpic++
 MPDIR = $(MPLIBS)
+MPINCLUDEPATH = /homes/abashyal/mpich/build/include
+INCLUDES = -I./include -I$(MPINCLUDESPATH) -I$(shell root-config --incdir)
 MPLIB = -lmpich -lmpi -lmpicxx -lmpl -lopa
 ROOTLIBS = $(shell root-config --libs) -lEG
 COPTS = -fPIC -DLINUX -O0 -g $(shell root-config --cflags) -m64
 INCLUDE = $(shell ls include/TMPIFile.h)
 INCLUDE += $(shell ls include/TClientInfo.h)
+MPINCLUDES = $(shell ls $(MPINCLUDEPATH)/*.h)
 all: lib programs
 
 lib: libTMPI.so
@@ -32,7 +34,7 @@ $(PROGS): % : src/%.o MPIDict.o  $(OBJS_LIB) libTMPI.so
 %.o: %.C
 	$(CC) $(COPTS) $(INCLUDES) -c -o $@ $<
 
-MPIDict.cxx: $(INCLUDE) include/Linkdef.h
+MPIDict.cxx: $(INCLUDE)  include/Linkdef.h 
 	@echo "Generating MPI Dictionary..."
 	@rootcint -f $@ -c -p $^
 
