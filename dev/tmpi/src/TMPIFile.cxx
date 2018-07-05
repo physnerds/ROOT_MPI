@@ -19,7 +19,6 @@ TMPIFile is like a TFile except it reads and writes in memory using TMPIFile and
 /*
 Will basically add all the headers from TMemFile.cxx File later...
  */
-#include "mpi.h"
 
 //Debug mode implementation later.....
 //...
@@ -163,3 +162,16 @@ void TMPIFile::R__DeleteObject(TDirectory *dir, Bool_t withReset)
    }
 }
 
+MPI_Comm TMPIFile::SplitMPIComm(MPI_Comm source, int comm_no){
+  int source_rank,source_size;
+  MPI_Comm row_comm;
+  MPI_Comm_rank(source,&source_rank);
+  MPI_Comm_size(source,&source_size);
+  if(comm_no>source_size){
+    SysError("TMPIFile","number of sub communicators larger than mother size");
+    exit(1);
+  }
+  int color = source_rank/comm_no;
+  MPI_Comm_split(source,color,source_rank,&row_comm);
+  return row_comm;
+}
