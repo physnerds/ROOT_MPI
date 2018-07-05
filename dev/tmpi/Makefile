@@ -7,6 +7,7 @@ MPLIB = -lmpich -lmpi -lmpicxx -lmpl -lopa
 ROOTLIBS = $(shell root-config --libs) -lEG
 COPTS = -fPIC -DLINUX -O0 -g $(shell root-config --cflags) -m64
 INCLUDE = $(shell ls include/TMPIFile.h)
+INCLUDE += $(shell ls include/TClientInfo.h)
 all: lib programs
 
 lib: libTMPI.so
