@@ -29,8 +29,10 @@ TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
 		   Option_t *option,const char *ftitle,Int_t compress,
 		   Int_t np,Int_t split):TMemFile(name,buffer,size,option,ftitle,compress){
   if(buffer)printf("buffer of non 0 size received\n");
-  //Initialize MPI's
-  MPI_Init(&argc,&argv);
+  //Initialize MPI if it is not already initialized...
+  int flag;
+  MPI_Initialized(&flag);
+  if(!flag) MPI_Init(&argc,&argv);
   
 }
 TMPIFile::~TMPIFile(){
