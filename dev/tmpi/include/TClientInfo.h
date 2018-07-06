@@ -4,7 +4,7 @@
 #include "TMemFile.h"
 #include "TTimeStamp.h"
 #include "TFile.h"
-class TClientInfo : public TFile{
+class TClientInfo{
 
  public:
   TFile *fFile;
