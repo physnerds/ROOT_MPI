@@ -335,6 +335,7 @@ void mpiparallelMergeServer(bool cache = false,int argc=0,MPI_Comm comm=0,int co
   //declare the functions here....
   void ReceiveAndMerge(bool cache,int argc, MPI_Comm _comm,int _color,int _rank,int _size);
   void CreateBufferAndSend(bool cache,int _argc,MPI_Comm _comm);
+  void metaFill(TTree *metatree,MPI_Comm _comm);
    int rank, size;
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&size);
@@ -348,10 +349,19 @@ void mpiparallelMergeServer(bool cache = false,int argc=0,MPI_Comm comm=0,int co
     UInt_t idx = rand->Integer(100);
     Float_t px,py;
     TTree *tree = new TTree("tree","tree");
+    TTree *metatree = new TTree("metatree","metatree");
     tree->SetAutoFlush(4000000);
     tree->Branch("px",&px);
     tree->Branch("py",&py);
     
+    Float_t POTS,location[3];
+    metatree->Branch("POTS",&POTS);
+    metatree->Branch("location",location,"location[3]/F");
+    POTS = 2.0E10*Float_t((size-1)); //user need to know provide handling meta data info...
+    location[0] =0.0;
+    location[1] = 0.0;
+    location[2] = 574.00;
+    metaFill(metatree,comm);
     gRandom->SetSeed();
     for(int i = 0;i<2500;i++){
       gRandom->Rannor(px,py);
@@ -492,8 +502,15 @@ void GetMergedROOTFile(TMemFile* file,TMemFile* fFile){
 }
 
 int main(int argc,char** argv){
+  // MPI_Init(&argc,&argv);
   MPI_Init(&argc,&argv);
-  int comm_no=4;
+  int flag;
+  MPI_Initialized(&flag);
+  if(!flag){
+      printf("MPI is not initialized\n");
+      MPI_Init(&argc,&argv);
+    }
+  int comm_no=10;
   MPI_Comm row_comm = SplitMPIComm(MPI_COMM_WORLD,comm_no);
   int global_rank,global_size;
   MPI_Comm_rank(MPI_COMM_WORLD,&global_rank);
@@ -507,8 +524,13 @@ int main(int argc,char** argv){
 }
 	  
     
-	     
-       
+void metaFill(TTree *metatree,MPI_Comm comm){
+  //0 is the collector but we can specify 1 or 2 as the only MPI which sends the meta tree information
+  int rank,size;
+  MPI_Comm_size(comm,&size);
+  
+  MPI_Comm_rank(comm,&rank);
+  if(rank==1)metatree->Fill();
+  else {return;}
+}	     
     
-
-	    
