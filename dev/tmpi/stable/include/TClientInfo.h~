@@ -1,0 +1,20 @@
+#ifndef ROOT_TClientInfo
+#define ROOT_TClientInfo
+
+#include "TFile.h"
+
+class TClientInfo : public TFile{
+
+ public:
+  TFile *fFile;
+  TString fLocalName;
+  UInt_t fContactsCount;
+  TTimeStamp fLastContact;
+  Double_t fTimeSincePrevContact;
+  void Set(TFile *file);
+  ClientInfo();//default constructor
+  ClientInfo(const char *filename, UInt_t clientID);//another constructor
+
+ClassDef(TClientInfo,0);
+};
+#endif
