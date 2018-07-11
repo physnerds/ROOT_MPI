@@ -19,14 +19,10 @@ class TMPIFile : public TMemFile {
 public:
   int argc;char** argv;
   MPI_Comm row_comm; //for now at least one comm to be declared..
+  char fMPIFilename[1000];
 public:
-  // Int_t split;
-  //Int_t np;
-//now we define the constructors, destructors and other needed files here...
-//constructor similar to TMemFile but some extra arguments...
-//later define what to do in constructor and destructor.....
-  TMPIFile(const char *name,char *buffer, Long64_t size=0,Option_t *option="",const char *ftitle="",Int_t compress=4,Int_t split=4);//at least two processors and division of subgroups
-  TMPIFile(const char *name, Option_t *option="", const char *ftitle="", Int_t compress=4,Int_t split=4);
+  TMPIFile(const char *name,char *buffer, Long64_t size=0,Option_t *option="",Int_t split = 4,const char *ftitle="",Int_t compress=4);//at least two processors and division of subgroups
+  TMPIFile(const char *name, Option_t *option="",Int_t split = 4, const char *ftitle="", Int_t compress=4);
 virtual ~TMPIFile();
  void R__MigrateKey(TDirectory *destination,TDirectory *source);
  void R__DeleteObject(TDirectory *dir,Bool_t withReset);
@@ -66,7 +62,7 @@ virtual ~TMPIFile();
  }; 
   MPI_Comm SplitMPIComm(MPI_Comm source,int comm_no);
   int fColor;
-
+  void GetRootName();
 
 };
 #endif

@@ -19,6 +19,7 @@ TMPIFile is like a TFile except it reads and writes in memory using TMPIFile and
 #include "TKey.h"
 #include "TSystem.h"
 #include "TMath.h"
+#include <string>
 /*
 Will basically add all the headers from TMemFile.cxx File later...
  */
@@ -29,8 +30,8 @@ ClassImp(TMPIFile);
 //the constructor should be similar to TMemFile...
 
 TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
-		   Option_t *option,const char *ftitle,Int_t compress,
-		   Int_t split):TMemFile(name,buffer,size,option,ftitle,compress),fColor(0){
+		   Option_t *option,Int_t split,const char *ftitle,
+		   Int_t compress):TMemFile(name,buffer,size,option,ftitle,compress),fColor(0){
   if(buffer)printf("buffer of non 0 size received\n");
   //Initialize MPI if it is not already initialized...
   int flag;
@@ -49,8 +50,8 @@ TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
     row_comm = MPI_COMM_WORLD;
   }
 }
-TMPIFile::TMPIFile(const char *name,Option_t *option,const char *ftitle,Int_t compress,
-		   Int_t split):TMemFile(name,option,ftitle,compress),fColor(0){
+TMPIFile::TMPIFile(const char *name,Option_t *option,Int_t split,const char *ftitle,
+		   Int_t compress):TMemFile(name,option,ftitle,compress),fColor(0){
   int flag;
   MPI_Initialized(&flag);
   if(!flag)MPI_Init(&argc,&argv);
@@ -273,8 +274,7 @@ void TMPIFile::SendBuffer(char *buff, int buff_size, MPI_Comm comm){
 void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
   if(rank!=0)return;
   THashTable mergers;
-  char incoming[100];
-  sprintf(incoming,"transient_incoming%d.root",fColor);
+  GetRootName();
   for(int i =1;i<size;i++){
     UInt_t clientIndex=i;
     int count;
@@ -291,23 +291,23 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
     buf = new char[number_bytes];
     MPI_Recv(buf,number_bytes,MPI_CHAR,i,fColor,comm,MPI_STATUS_IGNORE); 
 
-    TMemFile *infile = new TMemFile(incoming,buf,number_bytes,"UPDATE"); 
+    TMemFile *infile = new TMemFile(fMPIFilename,buf,number_bytes,"UPDATE"); 
 
     const Float_t clientThreshold = 0.75;
-    ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(incoming);
+    ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(fMPIFilename);
     if(!info){
-      printf("not info yet...\n");
-      info = new ParallelFileMerger(incoming,cache);
+      // printf("not info yet...\n");
+      info = new ParallelFileMerger(fMPIFilename,cache);
       mergers.Add(info);
     }
     if(R__NeedInitialMerge(infile)){
-       printf("TMPIFile::ReceiveAndMerge::trying to merge the file....\n");
+      // printf("TMPIFile::ReceiveAndMerge::trying to merge the file....\n");
       info->InitialMerge(infile);
-      printf("TMPIFile::ReceiveAndMerge::did I merge the file yet...\n");
+      // printf("TMPIFile::ReceiveAndMerge::did I merge the file yet...\n");
     }
     info->RegisterClient(client_Id,infile);
     if(info->NeedMerge(clientThreshold)){
-      printf("TMPIFile::ReceiveAndMErge::Merging from client %d\n",client_Id);
+      // printf("TMPIFile::ReceiveAndMErge::Merging from client %d\n",client_Id);
       info->Merge();
     }
     infile = 0;
@@ -385,4 +385,14 @@ void TMPIFile::MPIWrite(bool cache)
   MPI_Comm_size(row_comm,&size);
   CreateBufferAndSend(cache,row_comm,sent);
   ReceiveAndMerge(cache,row_comm,rank,size);
+}
+void TMPIFile::GetRootName()
+{
+  std::string _filename = this->GetName();
+  //printf("name is %s\n",_filename.c_str());
+  int found = _filename.rfind(".root");
+  if(found != std::string::npos)_filename.resize(found);
+  const char* _name = _filename.c_str();
+  sprintf(fMPIFilename,"%s_%d.root",_name,fColor);
+
 }

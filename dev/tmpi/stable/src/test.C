@@ -10,7 +10,7 @@ void test(){
   // TFile *_file = new TFile("tempfile_coming.root","READONLY");
  void R__MigrateKey(TDirectory *source, TDirectory *destination);
 
-  TMPIFile *newfile = new TMPIFile("newfile.root","RECREATE");
+ TMPIFile *newfile = new TMPIFile("Trial_MPIFile.root","RECREATE",5);
   TRandom *rand = new TRandom();
   Float_t px,py;
   TTree *tree = new TTree("tree","tree");
