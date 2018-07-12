@@ -5,6 +5,7 @@
 #include "TTree.h"
 #include "TSystem.h"
 #include "TMemFile.h"
+#include "TH1D.h"
 void test(){
   //first get a root file and copy into buffer.
   // TFile *_file = new TFile("tempfile_coming.root","READONLY");
@@ -14,6 +15,7 @@ void test(){
   TRandom *rand = new TRandom();
   Float_t px,py;
   TTree *tree = new TTree("tree","tree");
+  TH1D *trial_hist = new TH1D("trial_px","trial_px",40,-4,4);
   tree->SetAutoFlush(4000000);
   tree->Branch("px",&px);
   tree->Branch("py",&py);
@@ -21,8 +23,13 @@ void test(){
   gRandom->SetSeed();
   for(int i=0;i<2500;i++){
     gRandom->Rannor(px,py);
+    trial_hist->Fill(px);
     tree->Fill();
 }
+  trial_hist->SetTitle("PX Distribution");
+  trial_hist->GetXaxis()->SetTitle("Momentum GeV/c");
+  trial_hist->GetYaxis()->SetTitle("Counts");
+  trial_hist->Write();
   newfile->MPIWrite();
   // newfile->PurgeEveryThing();
   //newfile->Close();
