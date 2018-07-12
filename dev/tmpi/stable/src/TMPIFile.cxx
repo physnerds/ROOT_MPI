@@ -40,13 +40,26 @@ TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
   int global_size,global_rank;
   MPI_Comm_size(MPI_COMM_WORLD,&global_size);
   MPI_Comm_rank(MPI_COMM_WORLD,&global_rank);
-  if(split){
-  int tot = global_size/split;
-  fColor = global_rank/tot;
-  row_comm = SplitMPIComm(MPI_COMM_WORLD,tot);
+  if(split!=0){
+    if(2*split>global_size){
+      SysError("TMPIFile"," Number of Output File is larger than number of Processors Allocated. Number of processors should be two times larger than outpts. For %d outputs at least %d should be allocated instead of %d\n.",split,2*split,global_size);
+      exit(1);
+    }
+    int tot = global_size/split;
+    if(global_size%split!=0){
+      int n = global_size%split;
+      tot=tot+1;
+      fColor = global_rank/tot;
+      row_comm = SplitMPIComm(MPI_COMM_WORLD,tot);
+    }
+    else{
+      fColor = global_rank/tot;
+      row_comm = SplitMPIComm(MPI_COMM_WORLD,tot);
+    }
   }
   else{
-    fColor=0;
+    fColor = 0;
+    // printf("TMPIFile::TMPIFile no split \n");
     row_comm = MPI_COMM_WORLD;
   }
 }
@@ -59,13 +72,25 @@ TMPIFile::TMPIFile(const char *name,Option_t *option,Int_t split,const char *fti
   MPI_Comm_size(MPI_COMM_WORLD,&global_size);
   MPI_Comm_rank(MPI_COMM_WORLD,&global_rank);
   if(split!=0){
-  int tot = global_size/split;
-  fColor = global_rank/tot;
-  row_comm = SplitMPIComm(MPI_COMM_WORLD,tot);
+    if(2*split>global_size){
+      SysError("TMPIFile"," Number of Output File is larger than number of Processors Allocated. Number of processors should be two times larger than outpts. For %d outputs at least %d should be allocated instead of %d\n.",split,2*split,global_size);
+      exit(1);
+    }
+    int tot = global_size/split;
+    if(global_size%split!=0){
+      int n = global_size%split;
+      tot=tot+1;
+      fColor = global_rank/tot;
+      row_comm = SplitMPIComm(MPI_COMM_WORLD,tot);
+    }
+    else{
+      fColor = global_rank/tot;
+      row_comm = SplitMPIComm(MPI_COMM_WORLD,tot);
+    }
   }
   else{
     fColor = 0;
-     printf("TMPIFile::TMPIFile no split \n");
+    // printf("TMPIFile::TMPIFile no split \n");
     row_comm = MPI_COMM_WORLD;
   }
 }
@@ -289,6 +314,7 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
     int number_bytes;
     number_bytes = sizeof(char)*count;
     buf = new char[number_bytes];
+    //printf("Total counts from rank %d color %d : %d\n",i,fColor,count);
     MPI_Recv(buf,number_bytes,MPI_CHAR,i,fColor,comm,MPI_STATUS_IGNORE); 
 
     TMemFile *infile = new TMemFile(fMPIFilename,buf,number_bytes,"UPDATE"); 
@@ -395,4 +421,12 @@ void TMPIFile::GetRootName()
   const char* _name = _filename.c_str();
   sprintf(fMPIFilename,"%s_%d.root",_name,fColor);
 
+}
+Int_t TMPIFile::GetGlobalRank(){
+  int flag;
+  int rank;
+  MPI_Initialized(&flag);
+  if(flag)MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+  else{rank=-9999;}
+  return rank;
 }
