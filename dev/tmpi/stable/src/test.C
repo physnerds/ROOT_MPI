@@ -6,30 +6,28 @@
 #include "TSystem.h"
 #include "TMemFile.h"
 #include "TH1D.h"
+#include "dk2nu.h"
+#include "dkmeta.h"
 void test(){
   //first get a root file and copy into buffer.
   // TFile *_file = new TFile("tempfile_coming.root","READONLY");
- void R__MigrateKey(TDirectory *source, TDirectory *destination);
-
- TMPIFile *newfile = new TMPIFile("Trial_MPIFile.root","RECREATE",5);
-  TRandom *rand = new TRandom();
-  Float_t px,py;
-  TTree *tree = new TTree("tree","tree");
-  TH1D *trial_hist = new TH1D("trial_px","trial_px",40,-4,4);
-  tree->SetAutoFlush(4000000);
-  tree->Branch("px",&px);
-  tree->Branch("py",&py);
-  
-  gRandom->SetSeed();
-  for(int i=0;i<2500;i++){
-    gRandom->Rannor(px,py);
-    trial_hist->Fill(px);
-    tree->Fill();
-}
-  trial_hist->SetTitle("PX Distribution");
-  trial_hist->GetXaxis()->SetTitle("Momentum GeV/c");
-  trial_hist->GetYaxis()->SetTitle("Counts");
-  trial_hist->Write();
+  void R__MigrateKey(TDirectory *source, TDirectory *destination);
+  void FillDkMetaTree(bsim::DkMeta* dkmeta);
+  void FillDk2NuTree(bsim::Dk2Nu* dk2nu,int Seed);
+  TMPIFile *newfile = new TMPIFile("Trial_MPIFile.root","RECREATE",5);
+  int seed = newfile->GetMPILocalSize()+newfile->GetMPIColor()+newfile->GetMPILocalRank();
+  bsim::Dk2Nu* dk2nu = new bsim::Dk2Nu;
+  bsim::DkMeta* dkmeta = new bsim::DkMeta;
+  //create the trees.....
+  TTree *fDk2nu = new TTree("dk2nuTree","testing with dk2nu struc");
+  fDk2nu->Branch("dk2nu","bsim::Dk2Nu",&dk2nu,32000,99);
+  //now the dkmeta tree
+  TTree *fDkMeta = new TTree("dkmetaTree","testing with meta struc");
+  fDkMeta->Branch("dkmeta","bsim::DkMeta",&dkmeta,32000,99);
+  FillDkMetaTree(dkmeta);
+  FillDk2NuTree(dk2nu,seed);
+  fDkMeta->Fill();
+  fDk2nu->Fill();
   newfile->MPIWrite();
   // newfile->PurgeEveryThing();
   //newfile->Close();
@@ -106,6 +104,53 @@ printf("R__MigrateKey::Trying to get the list of keys\n");
       }
    }
    destination->SaveSelf();
+}
+void FillDkMetaTree(bsim::DkMeta* dkmeta){
+  dkmeta->pots = 1.0E5;
+  dkmeta->beamsim = "mpi_run_test";
+  dkmeta->physics = "neutrino decay info mock";
+  dkmeta->tgtcfg = "no_tgt";
+  dkmeta->physcuts = "sth_sth";
+  
+  
+  dkmeta->location.clear();
+  bsim::Location alocation(0.0,0.0,57400.00,"DUNE_NEAR_DET");
+  dkmeta->location.push_back(alocation);
+}
+//now fill the dk2nu information....
+void FillDk2NuTree(bsim::Dk2Nu* dk2nu,int seed){
+  //here we fill the so called events....
+  //clear some stuffs here
+  dk2nu->nuray.clear();
+  dk2nu->ancestor.clear();
+  dk2nu->vint.clear();
+  dk2nu->job = seed; //just the rank info
+  
+  TRandom *rand = new TRandom(seed);
+  Float_t px,py,pz,E;
+  for(int i=0;i<25000;i++){
+    gRandom->Rannor(px,py);
+    pz = px*23.3442+py*1.213;
+    E = sqrt(px*px+py*py+pz*pz);
+    bsim::NuRay Nuinfo(px,py,pz,E,1.0);
+    dk2nu->nuray.push_back(Nuinfo);
+    for(int j=0;j<4;j++){
+      bsim::Ancestor a;
+      TRandom *erand = new TRandom(seed+1243);
+      Float_t startx,starty,startz;
+      gRandom->Rannor(startx,starty);
+      a.startx = startx;
+      a.starty = starty;
+      a.startz = erand->PoissonD(startx);
+      a.startpx = erand->PoissonD(a.startz);
+      a.startpy = erand->PoissonD(a.startpx);
+      a.startpz = erand->PoissonD(a.startpy);
+      dk2nu->ancestor.push_back(a);
+      delete erand;
+    }
+  }
+  delete rand;
+    
 }
 
 #endif
