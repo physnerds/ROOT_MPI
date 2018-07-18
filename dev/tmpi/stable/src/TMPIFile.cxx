@@ -422,11 +422,37 @@ void TMPIFile::GetRootName()
   sprintf(fMPIFilename,"%s_%d.root",_name,fColor);
 
 }
-Int_t TMPIFile::GetGlobalRank(){
+Int_t TMPIFile::GetMPIGlobalRank(){
   int flag;
   int rank;
   MPI_Initialized(&flag);
   if(flag)MPI_Comm_rank(MPI_COMM_WORLD,&rank);
   else{rank=-9999;}
   return rank;
+}
+
+Int_t TMPIFile::GetMPILocalRank(){
+  int flag,rank;
+  MPI_Initialized(&flag);
+  if(flag)MPI_Comm_rank(row_comm,&rank);
+  else(rank=-9999);
+  return rank;
+}
+
+Int_t TMPIFile::GetMPIGlobalSize(){
+  int flag,size;
+  MPI_Initialized(&flag);
+  if(flag)MPI_Comm_size(MPI_COMM_WORLD,&size);
+  else{size=-1;}
+  return size;
+}
+Int_t TMPIFile::GetMPILocalSize(){
+  int flag,size;
+  MPI_Initialized(&flag);
+  if(flag)MPI_Comm_size(row_comm,&size);
+  else{size=-1;}
+  return size;
+}
+Int_t TMPIFile::GetMPIColor(){
+  return fColor;
 }
