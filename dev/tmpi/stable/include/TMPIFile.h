@@ -35,7 +35,12 @@ virtual ~TMPIFile();
   Bool_t R__NeedInitialMerge(TDirectory *dir);
   void RunParallel(bool cache=false,MPI_Comm comm=0,int sent=0);
   void MPIWrite(bool cache=false);
-  Int_t GetGlobalRank();
+  //few mpi information things...
+  Int_t GetMPIGlobalSize();
+  Int_t GetMPILocalSize();
+  Int_t GetMPILocalRank();
+  Int_t GetMPIColor();
+  Int_t GetMPIGlobalRank();
  ClassDef(TMPIFile,0)
  private:
  struct ParallelFileMerger : public TObject{
