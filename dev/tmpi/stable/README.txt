@@ -10,12 +10,16 @@ contents:
 src/:
   TMPIFile.cxx
   TClientInfo.cxx
+  dk2nu.cc
+  dkmeta.cc
 
 include/:
    TMPIFile.h
    TClientInfo.h
    Linkdef.h
-   
+   dk2nu.h
+   dkmeta.h
+   dk_Linkdef.h
 ./
   Makefile
   setenv.sh
