@@ -3,7 +3,11 @@ START OF FILE
 # WORKING TOWARDS THE STABILITY OF TMPIFILE AND FEW TO DO LIST FROM  
 # JULY 10 MEETING.....
 #
-#
+#SHORT NOTE IN DK2NU
+#Dk2nu ntuples are basically created for the neutrino experiments
+#that use FNAL-numi beam. It is supposed to contain information (kinematics 
+#as well as not kinematics informations) of the neutrino starting from primary 
+#proton to particle decaying to give neutrino.
 #
 #########################################################
 contents:
