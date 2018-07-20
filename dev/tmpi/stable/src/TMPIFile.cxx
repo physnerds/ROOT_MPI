@@ -1,3 +1,4 @@
+
 /*
 -------START OF COMMENT-----------
 TMPIFile is like a TFile except it reads and writes in memory using TMPIFile and later merges them into TFile using MPI class libraries...
@@ -292,8 +293,8 @@ void TMPIFile::SendBuffer(char *buff, int buff_size, MPI_Comm comm){
   int comm_size,comm_rank;
   MPI_Comm_size(comm,&comm_size);
   MPI_Comm_rank(comm,&comm_rank);
-  
-  if(comm_rank!=0)MPI_Send(buff,buff_size,MPI_CHAR,0,fColor,comm);
+  MPI_Request request;
+  if(comm_rank!=0)MPI_Isend(buff,buff_size,MPI_CHAR,0,fColor,comm,&request);
   else return;
 }
 void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
@@ -384,7 +385,8 @@ void TMPIFile::CreateBufferAndSend(TMemFile *file,bool cache,MPI_Comm comm,int s
   int count = file->GetSize();
   char *buff = new char[count];
   file->CopyTo(buff,count);
-  sent = MPI_Send(buff,count,MPI_CHAR,0,fColor,comm);
+  MPI_Request request;
+  sent = MPI_Isend(buff,count,MPI_CHAR,0,fColor,comm,&request);
   delete file;
 }
 void TMPIFile::CreateBufferAndSend(bool cache,MPI_Comm comm,int sent)
@@ -398,7 +400,8 @@ void TMPIFile::CreateBufferAndSend(bool cache,MPI_Comm comm,int sent)
   int count =  this->GetSize();
   char *buff = new char[count];
   this->CopyTo(buff,count);
-  sent = MPI_Send(buff,count,MPI_CHAR,0,fColor,comm);
+  MPI_Request request; 
+  sent = MPI_Isend(buff,count,MPI_CHAR,0,fColor,comm,&request);
   // delete this; /*Cannot delete the pointer this...the whole MPI Gives Stack error message.*/
 }
 
