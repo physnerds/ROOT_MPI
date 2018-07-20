@@ -6,23 +6,29 @@ def CheckForLogFile(proc,cwd,tot_nodes,tot_ranks,infile):
     logfile=proc+".output"
     errorfile=proc+".error"
     files=os.listdir(cwd)
-    if errorfile in files:
-        if os.path.getsize(errorfile)!=0:
-            print "Job had error....Exiting"
-            sys.exit(1)
+    #if errorfile in files:
+    #    if os.path.getsize(errorfile)!=0:
+    #        print "Job had error....Exiting"
+    #        sys.exit(1)
+    tot_sleep=0
     if logfile in files:
-        with open(logfile,'r') as lfile:
-            for line in lfile:
-                #print line
-                if "ElapsedTime" in line:
+        if os.path.getsize(logfile)!=0:
+            with open(logfile,'r') as lfile:
+                for line in lfile:
                     #print line
-                    newline=line.replace("ElapsedTime= ","")
-                    WriteOutput(tot_nodes,tot_ranks,newline,infile)
+                    if "ElapsedTime" in line:
+                        #print line
+                        newline=line.replace("ElapsedTime= ","")
+                        WriteOutput(tot_nodes,tot_ranks,newline,infile)
                     
     else:
         print "No logfiles now sleeping for 2  minutes"
         time.sleep(120)
         CheckForLogFile(proc,cwd,tot_nodes,tot_ranks,infile)
+        tot_sleep+=120
+        if tot_sleep/60>20:
+            print "Enough Sleeping...exiting!!!"
+            sys.exit(1)
         
 def CreateWrapper(tot_nodes,tot_ranks):
     if (tot_ranks%tot_nodes)!=0:
@@ -55,14 +61,20 @@ def WriteOutput(tot_nodes,tot_ranks,est_time,infile):
 
 
 filein=("theta_output_"+str(time.time())+".txt")
-proc=RunExecutableInTheta(8,8)
-infile=open(filein,'w')
-print proc
-proc=proc[:-1] #remove the trailing end of line output
-print len(proc)
-if proc:
-    #print proc,output
-    cwd=os.getcwd()
-    #CreateWrapper(8,16)
-    CheckForLogFile(proc,cwd,4,8,infile)
+#running in debug mode for different combinations...
 
+tot_nodes=[2,4,8]
+tot_ranks=[8,16,32]
+
+#proc=RunExecutableInTheta(8,8)
+infile=open(filein,'w')
+for i in range(0,len(tot_nodes)):
+    for j in range(0,len(tot_ranks)):
+        proc=RunExecutableInTheta(tot_nodes[i],tot_ranks[j])
+        print proc
+        if proc:
+            cwd=os.getcwd()
+            CheckForLogFile(proc,cwd,tot_nodes[i],tot_ranks[j],infile)
+            print "Job Ended Successfully...now sleeping for 1 minutes to allow clean up..\n"
+            time.sleep(60)#wait 1 minutes to clean up the process
+            
