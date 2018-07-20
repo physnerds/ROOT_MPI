@@ -31,12 +31,15 @@ def CreateWrapper(tot_nodes,tot_ranks):
     
 #subprocess.check_output(['source try_time.sh'])
 #subprocess.call(['./try_time.sh'])
-a=str(subprocess.check_output(['./try_time.sh']))
-if a:
-    print a
+proc=subprocess.check_output(['./try_time.sh'],stderr=subprocess.STDOUT,shell=True)
+proc=proc[:-1] #remove the trailing end of line output
+output=proc+".log"
+print len(proc)
+if proc:
+    print proc,output
     cwd=os.getcwd()
-    CreateWrapper(8,16)
+    #CreateWrapper(8,16)
     logfile=os.getenv("LOGFILE")
-    #CheckForLogFile("2.output",cwd)
+    CheckForLogFile(logfile,cwd)
 
 
