@@ -21,8 +21,8 @@ public:
   MPI_Comm row_comm; //for now at least one comm to be declared..
   char fMPIFilename[1000];
 public:
-  TMPIFile(const char *name,char *buffer, Long64_t size=0,Option_t *option="",Int_t split = 4,const char *ftitle="",Int_t compress=4);//at least two processors and division of subgroups
-  TMPIFile(const char *name, Option_t *option="",Int_t split = 4, const char *ftitle="", Int_t compress=4);
+  TMPIFile(const char *name,char *buffer, Long64_t size=0,Option_t *option="",Int_t split = 0,const char *ftitle="",Int_t compress=4);//at least two processors and division of subgroups
+  TMPIFile(const char *name, Option_t *option="",Int_t split = 0, const char *ftitle="", Int_t compress=4);
 virtual ~TMPIFile();
  void R__MigrateKey(TDirectory *destination,TDirectory *source);
  void R__DeleteObject(TDirectory *dir,Bool_t withReset);
