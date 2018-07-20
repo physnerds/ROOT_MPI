@@ -8,6 +8,9 @@
 #include "TH1D.h"
 #include "dk2nu.h"
 #include "dkmeta.h"
+#include <chrono>
+#include <thread>
+
 void test(){
   //first get a root file and copy into buffer.
   // TFile *_file = new TFile("tempfile_coming.root","READONLY");
@@ -128,7 +131,11 @@ void FillDk2NuTree(bsim::Dk2Nu* dk2nu,int seed){
   
   TRandom *rand = new TRandom(seed);
   Float_t px,py,pz,E;
-  for(int i=0;i<25000;i++){
+  for(int i=0;i<10;i++){
+    if(i%1000==0){
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+      // printf("now sleeping \n");
+    }
     gRandom->Rannor(px,py);
     pz = px*23.3442+py*1.213;
     E = sqrt(px*px+py*py+pz*pz);
