@@ -32,7 +32,7 @@ ClassImp(TMPIFile);
 
 TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
 		   Option_t *option,Int_t split,const char *ftitle,
-		   Int_t compress):TMemFile(name,buffer,size,option,ftitle,compress),fColor(0){
+		   Int_t compress):TMemFile(name,buffer,size,option,ftitle,compress),fColor(0),frequest(0){
   if(buffer)printf("buffer of non 0 size received\n");
   //Initialize MPI if it is not already initialized...
   int flag;
@@ -65,7 +65,7 @@ TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
   }
 }
 TMPIFile::TMPIFile(const char *name,Option_t *option,Int_t split,const char *ftitle,
-		   Int_t compress):TMemFile(name,option,ftitle,compress),fColor(0){
+		   Int_t compress):TMemFile(name,option,ftitle,compress),fColor(0),frequest(0){
   int flag;
   MPI_Initialized(&flag);
   if(!flag)MPI_Init(&argc,&argv);
@@ -294,7 +294,10 @@ void TMPIFile::SendBuffer(char *buff, int buff_size, MPI_Comm comm){
   MPI_Comm_size(comm,&comm_size);
   MPI_Comm_rank(comm,&comm_rank);
   MPI_Request request;
-  if(comm_rank!=0)MPI_Isend(buff,buff_size,MPI_CHAR,0,fColor,comm,&request);
+  if(comm_rank!=0){
+    MPI_Isend(buff,buff_size,MPI_CHAR,0,fColor,comm,&request);
+    MPI_Wait(&frequest,MPI_STATUS_IGNORE);
+  }
   else return;
 }
 void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
@@ -317,7 +320,8 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
     buf = new char[number_bytes];
     //printf("Total counts from rank %d color %d : %d\n",i,fColor,count);
     MPI_Recv(buf,number_bytes,MPI_CHAR,i,fColor,comm,MPI_STATUS_IGNORE); 
-
+    // MPI_Wait(&frequest,MPI_STATUS_IGNORE);
+    // frequest=0;
     TMemFile *infile = new TMemFile(fMPIFilename,buf,number_bytes,"UPDATE"); 
 
     const Float_t clientThreshold = 0.75;
@@ -399,9 +403,9 @@ void TMPIFile::CreateBufferAndSend(bool cache,MPI_Comm comm,int sent)
   if(rank==0)return;
   int count =  this->GetSize();
   char *buff = new char[count];
-  this->CopyTo(buff,count);
-  MPI_Request request; 
-  sent = MPI_Isend(buff,count,MPI_CHAR,0,fColor,comm,&request);
+  this->CopyTo(buff,count); 
+  sent = MPI_Isend(buff,count,MPI_CHAR,0,fColor,comm,&frequest);
+  MPI_Wait(&frequest,MPI_STATUS_IGNORE);
   // delete this; /*Cannot delete the pointer this...the whole MPI Gives Stack error message.*/
 }
 
