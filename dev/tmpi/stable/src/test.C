@@ -15,10 +15,11 @@ void test(){
   //first get a root file and copy into buffer.
   // TFile *_file = new TFile("tempfile_coming.root","READONLY");
   void R__MigrateKey(TDirectory *source, TDirectory *destination);
-  void FillDkMetaTree(bsim::DkMeta* dkmeta);
-  void FillDk2NuTree(bsim::Dk2Nu* dk2nu,int Seed);
-  TMPIFile *newfile = new TMPIFile("Trial_MPIFile.root","RECREATE",5);
+  void FillDkMetaTree(bsim::DkMeta* dkmeta,int sync_rate);
+  void FillDk2NuTree(bsim::Dk2Nu* dk2nu,int Seed,int sync_rate);
+  TMPIFile *newfile = new TMPIFile("Trial_MPIFile.root","RECREATE",3);
   int seed = newfile->GetMPILocalSize()+newfile->GetMPIColor()+newfile->GetMPILocalRank();
+  int sync_rate = newfile->GetSyncRate();
   bsim::Dk2Nu* dk2nu = new bsim::Dk2Nu;
   bsim::DkMeta* dkmeta = new bsim::DkMeta;
   //create the trees.....
@@ -27,13 +28,13 @@ void test(){
   //now the dkmeta tree
   TTree *fDkMeta = new TTree("dkmetaTree","testing with meta struc");
   fDkMeta->Branch("dkmeta","bsim::DkMeta",&dkmeta,32000,99);
-  FillDkMetaTree(dkmeta);
-  FillDk2NuTree(dk2nu,seed);
-  fDkMeta->Fill();
-  fDk2nu->Fill();
+  if(!newfile->IsCollector()){ //this one added to make sure that collector only collects and does nothing....
+    FillDkMetaTree(dkmeta,sync_rate);
+    FillDk2NuTree(dk2nu,seed,sync_rate);
+  // fDkMeta->Fill();
+  // fDk2nu->Fill();
+   }
   newfile->MPIWrite();
-  // newfile->PurgeEveryThing();
-  //newfile->Close();
 
 }
 #ifndef ___CINT__
@@ -108,7 +109,7 @@ printf("R__MigrateKey::Trying to get the list of keys\n");
    }
    destination->SaveSelf();
 }
-void FillDkMetaTree(bsim::DkMeta* dkmeta){
+void FillDkMetaTree(bsim::DkMeta* dkmeta,int sync_rate){
   dkmeta->pots = 1.0E5;
   dkmeta->beamsim = "mpi_run_test";
   dkmeta->physics = "neutrino decay info mock";
@@ -121,10 +122,10 @@ void FillDkMetaTree(bsim::DkMeta* dkmeta){
   dkmeta->location.push_back(alocation);
 }
 //now fill the dk2nu information....
-void FillDk2NuTree(bsim::Dk2Nu* dk2nu,int seed){
+void FillDk2NuTree(bsim::Dk2Nu* dk2nu,int seed,int sync_rate){
   //here we fill the so called events....
   //clear some stuffs here
-  dk2nu->nuray.clear();
+   dk2nu->nuray.clear();
   dk2nu->ancestor.clear();
   dk2nu->vint.clear();
   dk2nu->job = seed; //just the rank info
@@ -132,16 +133,18 @@ void FillDk2NuTree(bsim::Dk2Nu* dk2nu,int seed){
   TRandom *rand = new TRandom(seed);
   Float_t px,py,pz,E;
   for(int i=0;i<10;i++){
-    if(i%1000==0){
-      std::this_thread::sleep_for(std::chrono::seconds(10));
+    int sleep = int(rand->Gaus(3,1));
+     if(i%5==0){
+ 
+    	std::this_thread::sleep_for(std::chrono::seconds(sleep));
       // printf("now sleeping \n");
-    }
+     }
     gRandom->Rannor(px,py);
     pz = px*23.3442+py*1.213;
     E = sqrt(px*px+py*py+pz*pz);
     bsim::NuRay Nuinfo(px,py,pz,E,1.0);
     dk2nu->nuray.push_back(Nuinfo);
-    for(int j=0;j<4;j++){
+    for(int j=0;j<(sleep+2);j++){
       bsim::Ancestor a;
       TRandom *erand = new TRandom(seed+1243);
       Float_t startx,starty,startz;
