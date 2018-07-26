@@ -1,3 +1,4 @@
+
 //A TMemFile that utilizes MPI Libraries to create and Merge ROOT Files
 
 
@@ -10,6 +11,7 @@
 #include "TClientInfo.h"
 #include "TFileMerger.h"
 #include "THashTable.h"
+#include "TTree.h"
 #include "TBits.h"
 #include "/nfs2/abashyal/mpich/build/include/mpi.h"
 #include <vector>
@@ -20,9 +22,13 @@ public:
   int argc;char** argv;
   MPI_Comm row_comm; //for now at least one comm to be declared..
   char fMPIFilename[1000];
+  MPI_Request frequest;
+  Int_t fSplitLevel;
+  Int_t fSyncRate;
+  int fColor;
 public:
-  TMPIFile(const char *name,char *buffer, Long64_t size=0,Option_t *option="",Int_t split = 0,const char *ftitle="",Int_t compress=4);//at least two processors and division of subgroups
-  TMPIFile(const char *name, Option_t *option="",Int_t split = 0, const char *ftitle="", Int_t compress=4);
+  TMPIFile(const char *name,char *buffer, Long64_t size=0,Option_t *option="",Int_t split = 0,Int_t sync_rate=2,const char *ftitle="",Int_t compress=4);//at least two processors and division of subgroups
+  TMPIFile(const char *name, Option_t *option="",Int_t split = 0,Int_t sync_rate=2,const char *ftitle="", Int_t compress=4);
 virtual ~TMPIFile();
  void R__MigrateKey(TDirectory *destination,TDirectory *source);
  void R__DeleteObject(TDirectory *dir,Bool_t withReset);
@@ -32,18 +38,25 @@ virtual ~TMPIFile();
   void ReceiveAndMerge(bool cache=false,MPI_Comm=0,int rank=0,int size=0);
   void CreateBufferAndSend(TMemFile *file,bool cache=false,MPI_Comm comm=0,int sent = 0);
   void CreateBufferAndSend(bool cache=false,MPI_Comm comm=0,int sent = 0);
+  void CreateEmptyBufferAndSend(bool cache=false,MPI_Comm comm=0,int sent=0);
   Bool_t R__NeedInitialMerge(TDirectory *dir);
   void RunParallel(bool cache=false,MPI_Comm comm=0,int sent=0);
   void MPIWrite(bool cache=false);
+  void MPIWrite(int entry,int tot_entry, bool cache=kFALSE);
+  void MPIFinalWrite(bool cache=false);
   //few mpi information things...
   Int_t GetMPIGlobalSize();
+  Bool_t IsCollector();
   Int_t GetMPILocalSize();
   Int_t GetMPILocalRank();
   Int_t GetMPIColor();
   Int_t GetMPIGlobalRank();
+  Int_t GetSplitLevel();
+  Int_t GetSyncRate();
  ClassDef(TMPIFile,0)
  private:
- struct ParallelFileMerger : public TObject{
+
+  struct ParallelFileMerger : public TObject{
  public:
    typedef std::vector<TClientInfo>ClientColl_t;
    TString fFilename;
@@ -67,8 +80,6 @@ virtual ~TMPIFile();
 
  }; 
   MPI_Comm SplitMPIComm(MPI_Comm source,int comm_no);
-  int fColor;
   void GetRootName();
-
 };
 #endif
