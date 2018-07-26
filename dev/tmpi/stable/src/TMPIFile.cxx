@@ -20,6 +20,7 @@ TMPIFile is like a TFile except it reads and writes in memory using TMPIFile and
 #include "TKey.h"
 #include "TSystem.h"
 #include "TMath.h"
+#include "TTree.h"
 #include <string>
 /*
 Will basically add all the headers from TMemFile.cxx File later...
@@ -31,8 +32,8 @@ ClassImp(TMPIFile);
 //the constructor should be similar to TMemFile...
 
 TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
-		   Option_t *option,Int_t split,const char *ftitle,
-		   Int_t compress):TMemFile(name,buffer,size,option,ftitle,compress),fColor(0),frequest(0){
+		   Option_t *option,Int_t split,Int_t sync_rate,const char *ftitle,
+		   Int_t compress):TMemFile(name,buffer,size,option,ftitle,compress),fColor(0),frequest(0),fSplitLevel(split),fSyncRate(sync_rate){
   if(buffer)printf("buffer of non 0 size received\n");
   //Initialize MPI if it is not already initialized...
   int flag;
@@ -64,8 +65,8 @@ TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
     row_comm = MPI_COMM_WORLD;
   }
 }
-TMPIFile::TMPIFile(const char *name,Option_t *option,Int_t split,const char *ftitle,
-		   Int_t compress):TMemFile(name,option,ftitle,compress),fColor(0),frequest(0){
+TMPIFile::TMPIFile(const char *name,Option_t *option,Int_t split,Int_t sync_rate,const char *ftitle,
+		   Int_t compress):TMemFile(name,option,ftitle,compress),fColor(0),frequest(0),fSplitLevel(split),fSyncRate(sync_rate){
   int flag;
   MPI_Initialized(&flag);
   if(!flag)MPI_Init(&argc,&argv);
@@ -304,22 +305,32 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
   if(rank!=0)return;
   THashTable mergers;
   GetRootName();
-  for(int i =1;i<size;i++){
-    UInt_t clientIndex=i;
+  int empty_buff=0;
+  int counter=1;
+  // for(int i =1;i<size;i++){
+   while(counter!=size){
+     // printf("counter %d size-1: %d\n",counter,size-1);
+     // UInt_t clientIndex=i;
     int count;
     char *buf;
     MPI_Status status;
-    MPI_Probe(i,fColor,comm,&status);
+    MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,comm,&status);
+    // if(status==0)continue;
     MPI_Get_count(&status,MPI_CHAR,&count);
+    if(count==0){
+      empty_buff++;
+    }
     int source = status.MPI_SOURCE;
-    Int_t client_Id = source-1;
+    int tag = status.MPI_TAG;
+    Int_t client_Id = counter-1;
+    printf("ReceiveAndMerge:: From Worker Rank %d\n",source);    
     if(count<0)return;
     
     int number_bytes;
     number_bytes = sizeof(char)*count;
     buf = new char[number_bytes];
     //printf("Total counts from rank %d color %d : %d\n",i,fColor,count);
-    MPI_Recv(buf,number_bytes,MPI_CHAR,i,fColor,comm,MPI_STATUS_IGNORE); 
+    MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
     // MPI_Wait(&frequest,MPI_STATUS_IGNORE);
     // frequest=0;
     TMemFile *infile = new TMemFile(fMPIFilename,buf,number_bytes,"UPDATE"); 
@@ -349,7 +360,7 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
 	info->Merge();
       }
     }
-
+    counter=counter+1;
   }
   mergers.Delete();
 
@@ -406,9 +417,23 @@ void TMPIFile::CreateBufferAndSend(bool cache,MPI_Comm comm,int sent)
   this->CopyTo(buff,count); 
   sent = MPI_Isend(buff,count,MPI_CHAR,0,fColor,comm,&frequest);
   MPI_Wait(&frequest,MPI_STATUS_IGNORE);
+  delete buff; //perhaps rank will go back and do it again, might need to clear memory
   // delete this; /*Cannot delete the pointer this...the whole MPI Gives Stack error message.*/
 }
-
+void TMPIFile::CreateEmptyBufferAndSend(bool cache,MPI_Comm comm,int sent)
+{
+  int rank,size;
+  const char* _filename = this->GetName();
+  this->Write();
+  MPI_Comm_rank(comm,&rank);
+  MPI_Comm_size(comm,&size);
+  if(rank==0)return;
+  char *buff = new char[0]; 
+  sent = MPI_Isend(buff,0,MPI_CHAR,0,fColor,comm,&frequest);
+  MPI_Wait(&frequest,MPI_STATUS_IGNORE);
+  delete buff;
+  // delete this; /*Cannot delete the pointer this...the whole MPI Gives Stack error message.*/
+}
 
 void TMPIFile::MPIWrite(bool cache)
 {
@@ -416,8 +441,17 @@ void TMPIFile::MPIWrite(bool cache)
   int rank,size,sent;
   MPI_Comm_rank(row_comm,&rank);
   MPI_Comm_size(row_comm,&size);
-  CreateBufferAndSend(cache,row_comm,sent);
-  ReceiveAndMerge(cache,row_comm,rank,size);
+CreateBufferAndSend(cache,row_comm,sent);
+ReceiveAndMerge(cache,row_comm,rank,size);
+}
+void TMPIFile::MPIFinalWrite(bool cache)
+{
+  //by this time, MPI should be initialized...
+  int rank,size,sent;
+  MPI_Comm_rank(row_comm,&rank);
+  MPI_Comm_size(row_comm,&size);
+CreateEmptyBufferAndSend(cache,row_comm,sent);
+ReceiveAndMerge(cache,row_comm,rank,size);
 }
 void TMPIFile::GetRootName()
 {
@@ -462,4 +496,21 @@ Int_t TMPIFile::GetMPILocalSize(){
 }
 Int_t TMPIFile::GetMPIColor(){
   return fColor;
+}
+Bool_t TMPIFile::IsCollector(){
+  Bool_t coll=false;
+  int rank=this->GetMPILocalRank();
+  if(rank==0)coll=true;
+  return coll;
+}
+Int_t TMPIFile::GetSplitLevel(){
+  return fSplitLevel;
+}
+
+Int_t TMPIFile::GetSyncRate(){
+  return fSyncRate;
+}
+void TMPIFile::MPIWrite(int entry,int tot_entry,bool cache){
+  if(entry%fSyncRate==0)this->MPIWrite(cache);
+  if(entry==tot_entry-1)this->MPIFinalWrite(cache);
 }
