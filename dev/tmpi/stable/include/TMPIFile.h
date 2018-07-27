@@ -25,6 +25,7 @@ public:
   MPI_Request frequest;
   Int_t fSplitLevel;
   Int_t fSyncRate;
+
   int fColor;
 public:
   TMPIFile(const char *name,char *buffer, Long64_t size=0,Option_t *option="",Int_t split = 0,Int_t sync_rate=2,const char *ftitle="",Int_t compress=4);//at least two processors and division of subgroups
@@ -55,7 +56,8 @@ virtual ~TMPIFile();
   Int_t GetSyncRate();
  ClassDef(TMPIFile,0)
  private:
-
+  Int_t fEndProcess=0;
+  void UpdateEndProcess();
   struct ParallelFileMerger : public TObject{
  public:
    typedef std::vector<TClientInfo>ClientColl_t;
