@@ -8,6 +8,7 @@
 #include "TVirtualMutex.h"
 #include "TMPIFile.h"
 #include "TMemFile.h"
+#include <iostream>
 
 ClassImp(TClientInfo);
 
@@ -16,6 +17,7 @@ TClientInfo::TClientInfo(): fFile(0), fLocalName(), fContactsCount(0), fTimeSinc
 TClientInfo::~TClientInfo(){}
 TClientInfo::TClientInfo(const char *filename, UInt_t clientId) : fFile(0), fContactsCount(0), fTimeSincePrevContact(0) {
       fLocalName.Form("%s-%d-%d",filename,clientId,gSystem->GetPid());
+      std::cout<<" TClientInfo:: fLocalName "<<fLocalName<<std::endl;
    }
 
 
@@ -24,7 +26,7 @@ void TClientInfo::Set(TFile *file){
     // Register the new file as coming from this client.
     if (file != fFile) {
      const char* name = file->GetName();
-      if (fFile) {	 
+      if (fFile) {
 	R__MigrateKey(fFile,file);
 	// delete the previous memory file (if any)
 	delete file;
@@ -72,6 +74,7 @@ void TClientInfo::R__DeleteObject(TDirectory *dir, Bool_t withReset)
 {
 if (destination==0 || source==0) return;
 TIter nextkey(source->GetListOfKeys());
+ std::cout<<"TClientInfo::Trying to migrate the keys here"<<std::endl;
    TKey *key;
    while( (key = (TKey*)nextkey()) ) {
       TClass *cl = TClass::GetClass(key->GetClassName());
