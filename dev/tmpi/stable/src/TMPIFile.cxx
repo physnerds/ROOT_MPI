@@ -395,7 +395,7 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
   if(fEndProcess==size-1){
     mergers.Delete();
     // delete buf;
-    printf("Time to exit the function\n");
+    //  printf("Time to exit the function\n");
     return;
   }
   }
