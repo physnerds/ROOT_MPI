@@ -17,7 +17,7 @@ TClientInfo::TClientInfo(): fFile(0), fLocalName(), fContactsCount(0), fTimeSinc
 TClientInfo::~TClientInfo(){}
 TClientInfo::TClientInfo(const char *filename, UInt_t clientId) : fFile(0), fContactsCount(0), fTimeSincePrevContact(0) {
       fLocalName.Form("%s-%d-%d",filename,clientId,gSystem->GetPid());
-      std::cout<<" TClientInfo:: fLocalName "<<fLocalName<<std::endl;
+      //  std::cout<<" TClientInfo:: fLocalName "<<fLocalName<<std::endl;
    }
 
 
@@ -74,7 +74,7 @@ void TClientInfo::R__DeleteObject(TDirectory *dir, Bool_t withReset)
 {
 if (destination==0 || source==0) return;
 TIter nextkey(source->GetListOfKeys());
- std::cout<<"TClientInfo::Trying to migrate the keys here"<<std::endl;
+// std::cout<<"TClientInfo::Trying to migrate the keys here"<<std::endl;
    TKey *key;
    while( (key = (TKey*)nextkey()) ) {
       TClass *cl = TClass::GetClass(key->GetClassName());
