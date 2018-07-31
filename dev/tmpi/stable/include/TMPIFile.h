@@ -36,7 +36,9 @@ virtual ~TMPIFile();
  void PurgeEveryThing();
 
   void SendBuffer(char *buff,int buff_size,MPI_Comm comm);
-  void ReceiveAndMerge(bool cache=false,MPI_Comm=0,int rank=0,int size=0);
+  // void ReceiveAndMerge(bool cache=false,MPI_Comm=0,int rank=-1,int size=0,int source=-1,int tag=-1,int count=-1);
+  void ReceiveAndMerge(bool cache=false,MPI_Comm=0,int rank=-1,int size=0);
+  void ReceiveBuffer(bool cache=false,MPI_Comm=0,int rank=0,int size=0);
   void CreateBufferAndSend(TMemFile *file,bool cache=false,MPI_Comm comm=0,int sent = 0);
   void CreateBufferAndSend(bool cache=false,MPI_Comm comm=0,int sent = 0);
   void CreateEmptyBufferAndSend(bool cache=false,MPI_Comm comm=0,int sent=0);
@@ -54,6 +56,9 @@ virtual ~TMPIFile();
   Int_t GetMPIGlobalRank();
   Int_t GetSplitLevel();
   Int_t GetSyncRate();
+  void RunCollector(bool cache=false);
+  void MPIClose(bool cache=false);
+  void Sync(bool cache=false);
  ClassDef(TMPIFile,0)
  private:
   Int_t fEndProcess=0;
