@@ -14,7 +14,7 @@
 #include <iostream>
 
 void test1(){
-TMPIFile *newfile = new TMPIFile("Simple_MPIFile.root","RECREATE");
+  TMPIFile *newfile = new TMPIFile("Simple_MPIFile.root","RECREATE",1,4);
 int seed = newfile->GetMPILocalSize()+newfile->GetMPIColor()+newfile->GetMPILocalRank();
  int sync_rate = newfile->GetSyncRate();
  //now we need to divide the collector and worker load from here..
@@ -23,21 +23,25 @@ int seed = newfile->GetMPILocalSize()+newfile->GetMPIColor()+newfile->GetMPILoca
 TTree *tree = new TTree("tree","tree");
  tree->SetAutoFlush(400000000);
  Float_t px,py;
+ Int_t reco_time;
  tree->Branch("px",&px);
  tree->Branch("py",&py);
+ tree->Branch("reco_time",&reco_time);
  gRandom->SetSeed(seed);
+ int sleep=0;
  //total number of entries
  Int_t tot_entries = 15;
    for(int i=0;i<tot_entries;i++){
      //    std::cout<<"Event "<<i<<" local rank "<<newfile->GetMPILocalRank()<<std::endl;
      gRandom->Rannor(px,py);
-     int sleep = int(gRandom->Gaus(3,1));
      //simulating the reco time...per 5 events here....
-     if(i%5==0){
-       int sleep = int(gRandom->Gaus(3,1));
-        std::this_thread::sleep_for(std::chrono::seconds(sleep));
+     if(i%2==0){
+       sleep = int(gRandom->Gaus(10,5));
+       // printf("sleep would have been %d\n",sleep); 
+         std::this_thread::sleep_for(std::chrono::seconds(sleep));
        
      }
+     reco_time=sleep;
       tree->Fill();
       //at the end of the event loop...put the sync function
       //************START OF SYNCING IMPLEMENTATION FROM USERS' SIDE**********************
@@ -63,9 +67,11 @@ int main(int argc,char* argv[]){
   int rank,size;
   MPI_Init(&argc,&argv);
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-  //  printf("start of rank %d\n",rank);
+ clock_t then=clock();
   test1();
+  clock_t now = clock();
   MPI_Finalize();
+  // printf(" Rank %d Time %d\n",rank,(now-then)/CLOCKS_PER_SEC);
   //  printf("End of test function execution rank %d\n",rank);  
   return 0;
 }
