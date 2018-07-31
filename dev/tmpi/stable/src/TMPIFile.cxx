@@ -209,7 +209,7 @@ Bool_t TMPIFile::ParallelFileMerger::NeedMerge(Float_t clientThreshold){
 }
 Bool_t TMPIFile::ParallelFileMerger::NeedFinalMerge()
 {
-  printf("NEed final merge\n");
+  // printf("NEed final merge\n");
   return fClientsContact.CountBits()>0;
 }
  void TMPIFile::R__MigrateKey(TDirectory *destination, TDirectory *source)
@@ -303,53 +303,63 @@ void TMPIFile::SendBuffer(char *buff, int buff_size, MPI_Comm comm){
   }
   else return;
 }
-void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
+
+void TMPIFile::ReceiveBuffer(bool cache,MPI_Comm comm,int rank,int size){
   if(rank!=0)return;
+  int count;
+  MPI_Status status;
+  MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,comm,&status);
+  MPI_Get_count(&status,MPI_CHAR,&count);
+  int source = status.MPI_SOURCE;
+  int tag = status.MPI_TAG;
+  if(count==0){
+    char *buf;
+    //   printf("UPDATING END PROCESS %d\n",fEndProcess);
+    this->UpdateEndProcess();
+    MPI_Recv(buf,0,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
+    delete buf;
+  }
+  else {
+    // printf("Source %d and Count %d\n",source,count);
+    this->ReceiveAndMerge(cache,comm,rank,size);}
+}
+void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
+ if(rank!=0)return;
+ // char *buf;
+  this->GetRootName();
   THashTable mergers;
-  GetRootName();
   // int empty_buff=0;
   int counter=1;
-  int end_count=1;
-  bool empty=false;
-  // for(int i =1;i<size;i++){
-  //  while(fEndProcess<=size-1){
-
-     // UInt_t clientIndex=i;
-    int count;
+  while(fEndProcess!=size-1){
     char *buf;
-    MPI_Status status;
-    MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,comm,&status);
-    // if(status==0)continue;
-    MPI_Get_count(&status,MPI_CHAR,&count);
+    int count;
+  MPI_Status status;
+  MPI_Probe(MPI_ANY_SOURCE,MPI_ANY_TAG,comm,&status);
+  MPI_Get_count(&status,MPI_CHAR,&count);
+  int number_bytes = sizeof(char)*count;
+  buf = new char[number_bytes];
+  int source = status.MPI_SOURCE;
+  int tag = status.MPI_TAG;
+  if(number_bytes==0){
+    //  printf("UPDATING END PROCESS %d %d\n",fEndProcess,source);
+    this->UpdateEndProcess();
+    //   printf("PROCESS UPDATED %d %d\n",fEndProcess,source);
+     MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
+     //  delete [] buf;
+  }
+  else{
+  // printf("fEndProcess %d size-1 %d source %d\n",fEndProcess,size-1,source);
 
-    int source = status.MPI_SOURCE;
-    int tag = status.MPI_TAG;
-    Int_t client_Id = counter-1;
-    /* if(count==0){
-      buf = new char[0];
-      // printf("ReceiveAndMerge:: Empty buffer from Worker %d counter %d\n",source,counter);
-      //MPI_Recv(buf,0,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE);
-      this->UpdateEndProcess();
-      empty=true;
-       printf("counter %d size-1: %d\n",fEndProcess,size-1);
-       break;
-    }
-    */
-    if(count==0){
-      this->UpdateEndProcess();
-      return;
-    }
-    // printf("ReceiveAndMerge:: From Worker Rank %d\n",source);    
-    if(count<0)return;
-    int number_bytes;
-    number_bytes = sizeof(char)*count;
-    buf = new char[number_bytes];
-     printf("Total counts from rank %d color %d  %d\n",source,fColor,count);
+    //  printf("Total counts from rank %d color %d  %d\n",source,fColor,count);
     MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
-    // MPI_Wait(&frequest,MPI_STATUS_IGNORE);
-    // frequest=0;
+    // printf("ReceiveAndMerge:: From Worker Rank %d\n",source);    
+      Int_t client_Id =counter-1;
+      //  int number_bytes;
+      // number_bytes = sizeof(char)*count;
+      // buf = new char[number_bytes];
+      // MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
     TMemFile *infile = new TMemFile(fMPIFilename,buf,number_bytes,"UPDATE"); 
-
+    //  printf("Counter is %d\n",client_Id);
     const Float_t clientThreshold = 0.75;
     ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(fMPIFilename);
     if(!info){
@@ -376,12 +386,78 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
       }
     }
     counter=counter+1;
-    // }
-   if(fEndProcess==size-1)printf("End reached %d\n",rank); //doesnt exit the loop
+    // delete [] buf; UNCOMMENTING THIS GAVE DOUBLE LINKED ERROR WHICH MIGHT MEAN THAT PERHAPS
+    //MEMORY IS ALREADY CLEARED.....
+  }
+  // delete [] buf;
+  }
+  // mergers.Delete();
+  if(fEndProcess==size-1){
+    mergers.Delete();
+    // delete buf;
+    printf("Time to exit the function\n");
+    return;
+  }
+  }
+/*
+void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size,int source,int tag,int count){
+  if(source==-1){
+    printf("Undefined Source...\n");
+    exit(1);
+  }
+  THashTable mergers;
+  MPI_Status status;
+  this->GetRootName();
+  // int empty_buff=0;
+  int counter=1;
+  while(fEndProcess!=size-1){
+    printf("fEndProcess %d size-1 %d\n",fEndProcess,size-1);
+    int count;
+    char *buf;
+    int number_bytes;
+    number_bytes = sizeof(char)*count;
+    buf = new char[number_bytes];
+     printf("Total counts from rank %d color %d  %d\n",source,fColor,count);
+    MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
+    // printf("ReceiveAndMerge:: From Worker Rank %d\n",source);    
+      Int_t client_Id =counter-1;
+      //  int number_bytes;
+      // number_bytes = sizeof(char)*count;
+      // buf = new char[number_bytes];
+      // MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
+    TMemFile *infile = new TMemFile(fMPIFilename,buf,number_bytes,"UPDATE"); 
+    //  printf("Counter is %d\n",client_Id);
+    const Float_t clientThreshold = 0.75;
+    ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(fMPIFilename);
+    if(!info){
+      // printf("not info yet...\n");
+      info = new ParallelFileMerger(fMPIFilename,cache);
+      mergers.Add(info);
+    }
+    if(R__NeedInitialMerge(infile)){
+      //    printf("TMPIFile::ReceiveAndMerge::trying to merge the file....\n");
+      info->InitialMerge(infile);
+      //   printf("TMPIFile::ReceiveAndMerge::did I merge the file yet...\n");
+    }
+    info->RegisterClient(client_Id,infile);
+    if(info->NeedMerge(clientThreshold)){
+      //    printf("TMPIFile::ReceiveAndMErge::Merging from client %d\n",client_Id);
+      info->Merge();
+    }
+    infile = 0;
+  
+    TIter next(&mergers);
+    while((info = (ParallelFileMerger*)next())){
+      if(info->NeedFinalMerge()){
+	info->Merge();
+      }
+    }
+    counter=counter+1;
+  }
   mergers.Delete();
 
-}
-
+  }
+*/
 Bool_t TMPIFile::R__NeedInitialMerge(TDirectory *dir)
 {
   if (dir==0) return kFALSE;
@@ -431,23 +507,20 @@ void TMPIFile::CreateBufferAndSend(bool cache,MPI_Comm comm,int sent)
   int count =  this->GetSize();
   char *buff = new char[count];
   this->CopyTo(buff,count); 
-  sent = MPI_Isend(buff,count,MPI_CHAR,0,fColor,comm,&frequest);
-   MPI_Wait(&frequest,MPI_STATUS_IGNORE);
-  delete buff; //perhaps rank will go back and do it again, might need to clear memory
-  // delete this; /*Cannot delete the pointer this...the whole MPI Gives Stack error message.*/
+  sent = MPI_Send(buff,count,MPI_CHAR,0,fColor,comm);
+  //  MPI_Wait(&frequest,MPI_STATUS_IGNORE);
+  if(sent)delete [] buff; //cleanup the memory
 }
 void TMPIFile::CreateEmptyBufferAndSend(bool cache,MPI_Comm comm,int sent)
 {
   int rank,size;
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&size);
-  if(rank==0)return;
-  char *buff = new char[0]; 
-  sent = MPI_Isend(buff,0,MPI_CHAR,0,fColor,comm,&frequest);
-   MPI_Wait(&frequest,MPI_STATUS_IGNORE);
-   if(frequest)printf("Final request sent from rank %d\n",rank);
-  delete buff;
-  // delete this; /*Cannot delete the pointer this...the whole MPI Gives Stack error message.*/
+  if(this->IsCollector())return;
+  char* buff;
+  sent = MPI_Send(buff,0,MPI_CHAR,0,fColor,comm);
+  // printf("Sent Empty Buffer..at barrier now %d\n",rank);
+  if(sent)delete [] buff; //memory cleanup
 }
 
 void TMPIFile::MPIWrite(bool cache)
@@ -478,6 +551,7 @@ void TMPIFile::GetRootName()
   sprintf(fMPIFilename,"%s_%d.root",_name,fColor);
 
 }
+
 Int_t TMPIFile::GetMPIGlobalRank(){
   int flag;
   int rank;
@@ -529,12 +603,36 @@ Int_t TMPIFile::GetSyncRate(){
 void TMPIFile::MPIWrite(int entry,int tot_entry,bool cache){
   //if(entry%fSyncRate==0)
   this->MPIWrite(cache);
-  // printf("MPIWrite:: entry %d tot_entry %d rank %d\n",entry,tot_entry,this->GetMPILocalRank());
    if(entry==tot_entry-1){
-  // printf("Doing final write\n");
    this->MPIFinalWrite(cache);
      }
 }
 void TMPIFile::UpdateEndProcess(){
   fEndProcess=fEndProcess+1;
+}
+void TMPIFile::RunCollector(bool cache)
+{
+  //by this time, MPI should be initialized...
+  int rank,size;
+  MPI_Comm_rank(row_comm,&rank);
+  MPI_Comm_size(row_comm,&size);
+  ReceiveAndMerge(cache,row_comm,rank,size);
+}
+
+void TMPIFile::Sync(bool cache){
+  int rank,size,sent;
+  MPI_Comm_rank(row_comm,&rank);
+  MPI_Comm_size(row_comm,&size);
+  CreateBufferAndSend(cache,row_comm,sent);
+}
+void TMPIFile::MPIClose(bool cache){
+    int rank,size,sent;
+  MPI_Comm_rank(row_comm,&rank);
+  MPI_Comm_size(row_comm,&size);
+  CreateEmptyBufferAndSend(cache,row_comm,sent);
+  // printf("Now trying to close %d rank\n",rank);
+   MPI_Barrier(row_comm);
+   //okay once they reach the buffer...just close it.
+   this->Close();
+  
 }
