@@ -341,14 +341,14 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
   int source = status.MPI_SOURCE;
   int tag = status.MPI_TAG;
   if(number_bytes==0){
-    //  printf("UPDATING END PROCESS %d %d\n",fEndProcess,source);
+    // printf("UPDATING END PROCESS %d %d\n",fEndProcess,source);
     this->UpdateEndProcess();
-    //   printf("PROCESS UPDATED %d %d\n",fEndProcess,source);
+       printf("PROCESS UPDATED %d %d\n",fEndProcess,source);
      MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
      //  delete [] buf;
   }
   else{
-  // printf("fEndProcess %d size-1 %d source %d\n",fEndProcess,size-1,source);
+     printf("fEndProcess %d size-1 %d source %d\n",fEndProcess,size-1,source);
 
     //  printf("Total counts from rank %d color %d  %d\n",source,fColor,count);
     MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
@@ -386,16 +386,16 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
       }
     }
     counter=counter+1;
-    // delete [] buf; UNCOMMENTING THIS GAVE DOUBLE LINKED ERROR WHICH MIGHT MEAN THAT PERHAPS
+    // delete [] buf; //UNCOMMENTING THIS GAVE DOUBLE LINKED ERROR WHICH MIGHT MEAN THAT PERHAPS
     //MEMORY IS ALREADY CLEARED.....
   }
-  // delete [] buf;
+   delete [] buf;
   }
   // mergers.Delete();
   if(fEndProcess==size-1){
     mergers.Delete();
     // delete buf;
-    //  printf("Time to exit the function\n");
+      printf("Time to exit the function\n");
     return;
   }
   }
