@@ -24,6 +24,9 @@ public:
   char fMPIFilename[1000];
   Int_t fSplitLevel;
   Int_t fSyncRate;
+  //these values only for debugging purposes...
+  Double_t fWorker_Wait_time=-9999.0;
+  Double_t fWorker_Work_time=-9999.0;
 
   int fColor;
 public:
@@ -41,7 +44,7 @@ virtual ~TMPIFile();
   void CreateBufferAndSend(TMemFile *file,bool cache=false,MPI_Comm comm=0,int sent = 0);
   void CreateBufferAndSend(bool cache=false,MPI_Comm comm=0);
   void CreateEmptyBufferAndSend(bool cache=false,MPI_Comm comm=0);
-  Bool_t R__NeedInitialMerge(TDirectory *dir);
+          Bool_t R__NeedInitialMerge(TDirectory *dir);
   void RunParallel(bool cache=false,MPI_Comm comm=0,int sent=0);
   void MPIWrite(bool cache=false);
   void MPIWrite(int entry,int tot_entry, bool cache=kFALSE);
@@ -62,8 +65,8 @@ virtual ~TMPIFile();
  private:
   Int_t fEndProcess=0;
   void UpdateEndProcess();
-  MPI_Request fRequest;
-  char *fSendBuf;
+  MPI_Request fRequest=0;
+  char *fSendBuf=0;
   struct ParallelFileMerger : public TObject{
  public:
    typedef std::vector<TClientInfo>ClientColl_t;
