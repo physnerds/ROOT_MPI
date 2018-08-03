@@ -1,4 +1,3 @@
-
 #include "TMPIFile.h"
 #include "TFile.h"
 #include "TROOT.h"
@@ -23,22 +22,25 @@ int seed = newfile->GetMPILocalSize()+newfile->GetMPIColor()+newfile->GetMPILoca
  else{
 TTree *tree = new TTree("tree","tree");
  tree->SetAutoFlush(400000000);
- Float_t px,py;
+ Float_t px,py,work_time,wait_time;
  Int_t reco_time;
  tree->Branch("px",&px);
  tree->Branch("py",&py);
  tree->Branch("reco_time",&reco_time);
+ tree->Branch("work_time",&work_time);
+ tree->Branch("wait_time",&wait_time);
  gRandom->SetSeed(seed);
  int   sleep=0;
  //total number of entries
  Int_t tot_entries = 15;
    for(int i=0;i<tot_entries;i++){
      //    std::cout<<"Event "<<i<<" local rank "<<newfile->GetMPILocalRank()<<std::endl;
+       work_time = newfile->Work_time;
+       wait_time = newfile->Wait_time;
      gRandom->Rannor(px,py);
      //simulating the reco time...per 5 events here....
      if(i%2==0){
-       while((sleep>15)||(sleep<5))
-	 sleep = int(gRandom->Gaus(10,5));
+	 sleep = abs(gRandom->Gaus(10,5));
        // printf("sleep would have been %d\n",sleep); 
         std::this_thread::sleep_for(std::chrono::seconds(sleep));
        
