@@ -355,7 +355,7 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
     //printf("ReceiveAndMerge:: From Worker Rank %d %d\n",source,count);    
     Int_t client_Id =counter-1; 
     TMemFile *infile = new TMemFile(fMPIFilename,buf,number_bytes,"UPDATE"); 
-      printf("Counter is %d\n",client_Id);
+    // printf("Counter is %d\n",client_Id);
     const Float_t clientThreshold = 0.75;
     ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(fMPIFilename);
     if(!info){
@@ -366,7 +366,7 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
     if(R__NeedInitialMerge(infile)){
       // printf("TMPIFile::ReceiveAndMerge::trying to merge the file....\n");
       info->InitialMerge(infile);
-         printf("TMPIFile::ReceiveAndMerge::did I merge the file yet...\n");
+      //  printf("TMPIFile::ReceiveAndMerge::did I merge the file yet...\n");
     }
     info->RegisterClient(client_Id,infile);
     if(info->NeedMerge(clientThreshold)){
@@ -617,14 +617,23 @@ void TMPIFile::Sync(bool cache){
   MPI_Comm_rank(row_comm,&rank);
   MPI_Comm_size(row_comm,&size);
    if(!fRequest){
-  CreateBufferAndSend(cache,row_comm);
+      double work_now = MPI_Wtime();
+     CreateBufferAndSend(cache,row_comm);
+      double work_then = MPI_Wtime();
+      Work_time = work_then-work_now;
    }
    else{
   //   printf("fRequest is made %d\n",rank);
+       double wait_now = MPI_Wtime();
       MPI_Wait(&fRequest,MPI_STATUS_IGNORE);
       if(fRequest) delete[] fSendBuf;
      fRequest=0;
+      double wait_then = MPI_Wtime();
+     Wait_time = wait_then-wait_now;
+      double work_now = MPI_Wtime();
      CreateBufferAndSend(cache,row_comm);
+      double work_then = MPI_Wtime();
+      Work_time = work_then-work_now;
     //  printf("Next buffer is sent %d\n",rank);
    }
 }
