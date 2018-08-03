@@ -22,7 +22,6 @@ public:
   int argc;char** argv;
   MPI_Comm row_comm; //for now at least one comm to be declared..
   char fMPIFilename[1000];
-  MPI_Request frequest;
   Int_t fSplitLevel;
   Int_t fSyncRate;
 
@@ -40,8 +39,8 @@ virtual ~TMPIFile();
   void ReceiveAndMerge(bool cache=false,MPI_Comm=0,int rank=-1,int size=0);
   void ReceiveBuffer(bool cache=false,MPI_Comm=0,int rank=0,int size=0);
   void CreateBufferAndSend(TMemFile *file,bool cache=false,MPI_Comm comm=0,int sent = 0);
-  void CreateBufferAndSend(bool cache=false,MPI_Comm comm=0,int sent = 0);
-  void CreateEmptyBufferAndSend(bool cache=false,MPI_Comm comm=0,int sent=0);
+  void CreateBufferAndSend(bool cache=false,MPI_Comm comm=0);
+  void CreateEmptyBufferAndSend(bool cache=false,MPI_Comm comm=0);
   Bool_t R__NeedInitialMerge(TDirectory *dir);
   void RunParallel(bool cache=false,MPI_Comm comm=0,int sent=0);
   void MPIWrite(bool cache=false);
@@ -63,6 +62,8 @@ virtual ~TMPIFile();
  private:
   Int_t fEndProcess=0;
   void UpdateEndProcess();
+  MPI_Request fRequest;
+  char *fSendBuf;
   struct ParallelFileMerger : public TObject{
  public:
    typedef std::vector<TClientInfo>ClientColl_t;
