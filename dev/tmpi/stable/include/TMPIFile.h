@@ -25,8 +25,8 @@ public:
   Int_t fSplitLevel;
   Int_t fSyncRate;
   //these values only for debugging purposes...
-  Double_t fWorker_Wait_time=-9999.0;
-  Double_t fWorker_Work_time=-9999.0;
+  Double_t Wait_time=-9999.99;
+  Double_t Work_time=-9999.99;
 
   int fColor;
 public:
@@ -67,6 +67,8 @@ virtual ~TMPIFile();
   void UpdateEndProcess();
   MPI_Request fRequest=0;
   char *fSendBuf=0;
+  //these are only for debug purposes
+
   struct ParallelFileMerger : public TObject{
  public:
    typedef std::vector<TClientInfo>ClientColl_t;
