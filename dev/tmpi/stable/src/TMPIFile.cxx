@@ -34,7 +34,7 @@ ClassImp(TMPIFile);
 TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
 		   Option_t *option,Int_t split,Int_t sync_rate,const char *ftitle,
 		   Int_t compress):TMemFile(name,buffer,size,option,ftitle,compress),fColor(0),fRequest(0),fSendBuf(0),fSplitLevel(split),fSyncRate(sync_rate){
-  if(buffer)printf("buffer of non 0 size received\n");
+  // if(buffer)printf("buffer of non 0 size received\n");
   //Initialize MPI if it is not already initialized...
   int flag;
   MPI_Initialized(&flag);
@@ -67,7 +67,7 @@ TMPIFile::TMPIFile(const char *name, char *buffer, Long64_t size,
   }
 }
 TMPIFile::TMPIFile(const char *name,Option_t *option,Int_t split,Int_t sync_rate,const char *ftitle,
-		   Int_t compress):TMemFile(name,option,ftitle,compress),fColor(0),fRequest(0),fSplitLevel(split),fSyncRate(sync_rate){
+		   Int_t compress):TMemFile(name,option,ftitle,compress),fColor(0),fRequest(0),fSendBuf(0),fSplitLevel(split),fSyncRate(sync_rate){
   int flag;
   MPI_Initialized(&flag);
   if(!flag)MPI_Init(&argc,&argv);
@@ -100,6 +100,7 @@ TMPIFile::TMPIFile(const char *name,Option_t *option,Int_t split,Int_t sync_rate
 TMPIFile::~TMPIFile(){
   //  MPI_Finalize();
   Close();
+  fRequest=0;
   //TRACE("destroy");
 }
 void TMPIFile::PurgeEveryThing(){
@@ -325,7 +326,6 @@ void TMPIFile::ReceiveBuffer(bool cache,MPI_Comm comm,int rank,int size){
 }
 void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
  if(rank!=0)return;
- // char *buf;
   this->GetRootName();
   THashTable mergers;
   // int empty_buff=0;
@@ -348,18 +348,14 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
      //  delete [] buf;
   }
   else{
-    //printf("fEndProcess %d size-1 %d source %d\n",fEndProcess,size-1,source);
+    // printf("fEndProcess %d size-1 %d source %d\n",fEndProcess,size-1,source);
 
     //  printf("Total counts from rank %d color %d  %d\n",source,fColor,count);
     MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
-    // printf("ReceiveAndMerge:: From Worker Rank %d\n",source);    
-      Int_t client_Id =counter-1;
-      //  int number_bytes;
-      // number_bytes = sizeof(char)*count;
-      // buf = new char[number_bytes];
-      // MPI_Recv(buf,number_bytes,MPI_CHAR,source,tag,comm,MPI_STATUS_IGNORE); 
+    //printf("ReceiveAndMerge:: From Worker Rank %d %d\n",source,count);    
+    Int_t client_Id =counter-1; 
     TMemFile *infile = new TMemFile(fMPIFilename,buf,number_bytes,"UPDATE"); 
-    //  printf("Counter is %d\n",client_Id);
+      printf("Counter is %d\n",client_Id);
     const Float_t clientThreshold = 0.75;
     ParallelFileMerger *info = (ParallelFileMerger*)mergers.FindObject(fMPIFilename);
     if(!info){
@@ -368,13 +364,13 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
       mergers.Add(info);
     }
     if(R__NeedInitialMerge(infile)){
-      //    printf("TMPIFile::ReceiveAndMerge::trying to merge the file....\n");
+      // printf("TMPIFile::ReceiveAndMerge::trying to merge the file....\n");
       info->InitialMerge(infile);
-      //   printf("TMPIFile::ReceiveAndMerge::did I merge the file yet...\n");
+         printf("TMPIFile::ReceiveAndMerge::did I merge the file yet...\n");
     }
     info->RegisterClient(client_Id,infile);
     if(info->NeedMerge(clientThreshold)){
-      //    printf("TMPIFile::ReceiveAndMErge::Merging from client %d\n",client_Id);
+      // printf("TMPIFile::ReceiveAndMErge::Merging from client %d\n",client_Id);
       info->Merge();
     }
     infile = 0;
@@ -386,8 +382,7 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
       }
     }
     counter=counter+1;
-    // delete [] buf; //UNCOMMENTING THIS GAVE DOUBLE LINKED ERROR WHICH MIGHT MEAN THAT PERHAPS
-    //MEMORY IS ALREADY CLEARED.....
+    // printf("Counter UPDATED %d\n",counter);
   }
    delete [] buf;
   }
@@ -395,7 +390,7 @@ void TMPIFile::ReceiveAndMerge(bool cache,MPI_Comm comm,int rank,int size){
   if(fEndProcess==size-1){
     mergers.Delete();
     // delete buf;
-    //  printf("Time to exit the function\n");
+    // printf("Time to exit the function\n");
     return;
   }
   }
@@ -438,38 +433,89 @@ void TMPIFile::CreateBufferAndSend(TMemFile *file,bool cache,MPI_Comm comm,int s
   sent = MPI_Isend(buff,count,MPI_CHAR,0,fColor,comm,&request);
   delete file;
 }
+/*
 void TMPIFile::CreateBufferAndSend(bool cache,MPI_Comm comm)
 {
   int rank,size;
-  this->Write(); //this actually is a memfile and will be written in memory
+  //  this->Write(); //this actually is a memfile and will be written in memory
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&size);
-  if(rank==0)return;
-  int count =  this->GetSize();
+  if(rank==0)return; //this needs to go away...it should be taken care in the macro
+  //  int count =  this->GetSize();
+  printf("Request stat is %d\n",fRequest);
   if(!fRequest){
+  this->Write(); //this actually is a memfile and will be written in memory
+  printf("Request stat not made  is %d\n",fRequest);
+  int count =  this->GetSize();
+    printf("Request not yet made %d\n",rank);
+    //   double w_then = MPI_Wtime();
   fSendBuf = new char[count];
   this->CopyTo(fSendBuf,count); 
   MPI_Isend(fSendBuf,count,MPI_CHAR,0,fColor,comm,&fRequest);
-  //  MPI_Wait(&frequest,MPI_STATUS_IGNORE);
+
   }
   else{
+    printf("Request already made %d %d\n",rank,fRequest);
+    // double wait_then = MPI_Wtime();
     MPI_Wait(&fRequest,MPI_STATUS_IGNORE);
-    delete[] fSendBuf;
+    if(fRequest)delete[] fSendBuf;
+    fRequest=0;
+    //   double w_then = MPI_Wtime();
+  this->Write(); //this actually is a memfile and will be written in memory
+  int count =  this->GetSize();
     fSendBuf = new char[count];
+    printf("Getting new buffer %d\n",rank);
     this->CopyTo(fSendBuf,count);
-  MPI_Isend(fSendBuf,count,MPI_CHAR,0,fColor,comm,&fRequest);    
+     MPI_Isend(fSendBuf,count,MPI_CHAR,0,fColor,comm,&fRequest); 
+    printf("Buffer Sent %d %d\n",rank,count);
   }
 }
 void TMPIFile::CreateEmptyBufferAndSend(bool cache,MPI_Comm comm)
 {
+  printf("Now Sending Empty buffer\n");
   int rank,size;
   MPI_Comm_rank(comm,&rank);
   MPI_Comm_size(comm,&size);
   if(this->IsCollector())return;
+  if(fRequest){
+    MPI_Wait(&fRequest,MPI_STATUS_IGNORE);
+    delete[] fSendBuf;
+  }
+  fRequest=0;
   MPI_Isend(fSendBuf,0,MPI_CHAR,0,fColor,comm,&fRequest);
   if(fRequest)delete[] fSendBuf; //memory cleanup
 }
-
+*/
+void TMPIFile::CreateBufferAndSend(bool cache,MPI_Comm comm)
+{
+  int rank,size;
+  const char* _filename = this->GetName();
+  this->Write();
+  MPI_Comm_rank(comm,&rank);
+  MPI_Comm_size(comm,&size);
+  if(rank==0)return;
+  int count =  this->GetSize();
+   fSendBuf = new char[count];
+  this->CopyTo(fSendBuf,count); 
+  MPI_Isend(fSendBuf,count,MPI_CHAR,0,fColor,comm,&fRequest);
+ //perhaps rank will go back and do it again, might need to clear memory
+  // delete this; /*Cannot delete the pointer this...the whole MPI Gives Stack error message.*/
+}
+void TMPIFile::CreateEmptyBufferAndSend(bool cache,MPI_Comm comm)
+{
+  if(fRequest){
+    MPI_Wait(&fRequest,MPI_STATUS_IGNORE);
+    fRequest=0;
+    delete[] fSendBuf;
+  }
+  int rank,size;
+  MPI_Comm_rank(comm,&rank);
+  MPI_Comm_size(comm,&size);
+  if(rank==0)return;
+  int sent= MPI_Send(fSendBuf,0,MPI_CHAR,0,fColor,comm);
+  if(sent)delete[] fSendBuf;
+  // delete this; /*Cannot delete the pointer this...the whole MPI Gives Stack error message.*/
+}
 void TMPIFile::MPIWrite(bool cache)
 {
   //by this time, MPI should be initialized...
@@ -570,7 +616,17 @@ void TMPIFile::Sync(bool cache){
   int rank,size;
   MPI_Comm_rank(row_comm,&rank);
   MPI_Comm_size(row_comm,&size);
+   if(!fRequest){
   CreateBufferAndSend(cache,row_comm);
+   }
+   else{
+  //   printf("fRequest is made %d\n",rank);
+      MPI_Wait(&fRequest,MPI_STATUS_IGNORE);
+      if(fRequest) delete[] fSendBuf;
+     fRequest=0;
+     CreateBufferAndSend(cache,row_comm);
+    //  printf("Next buffer is sent %d\n",rank);
+   }
 }
 void TMPIFile::MPIClose(bool cache){
     int rank,size;
